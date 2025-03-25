@@ -1,0 +1,8 @@
+site_name: Parallel GroupBy
+
+nav:
+  - Home: index.md
+  - Proposal: proposal.md
+
+theme:
+  name: material
