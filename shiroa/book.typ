@@ -8,8 +8,8 @@
     #prefix-chapter("web-proposal.typ")[Proposal]
     #prefix-chapter("web-milestone.typ")[Milestone]
     #prefix-chapter("web-report.typ")[Report]
-    = #text(weight: 400)[Static site generated using https://myriad-dreamin.github.io/shiroa/]
-    Testing
+    // = #text(weight: 400)[Static site generated using https://myriad-dreamin.github.io/shiroa/]
+    // Testing
   ]
 )
 
