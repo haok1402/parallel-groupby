@@ -2,7 +2,7 @@
 #show: book
 
 #book-meta(
-  // title: "Parallel GROUP BY",
+  title: "",
   summary: [
     = Parallel GROUP BY
     #prefix-chapter("web-proposal.typ")[Proposal]
