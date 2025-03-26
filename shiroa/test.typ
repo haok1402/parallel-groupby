@@ -2,34 +2,22 @@
 
 #show: book-page.with(title: "Proposal")
 
-#text(size: 32pt)[TITLE]
 
-#let authors(
-  authors: ()
-) = {
-  grid(
-    columns: (1fr,) * 2,
-    row-gutter: 24pt,
-    ..authors.map(author => [
-      #author.name \
-      #author.affiliation \
-      #link("mailto:" + author.email)
-    ]),
-  )
-}
 
-#authors(authors: (
-  (
-    name: "Theresa Tungsten",
-    affiliation: "Artos Institute",
-    email: "tung@artos.edu",
+
+#import "template.typ": docHeader
+
+#docHeader(
+  title: "Adaptive Parallel Execution of GROUP BY Aggregation Queries",
+  authors: (
+    (name: "Leon Lu", email: "lianglu@andrew.cmu.edu", affiliation: "Carnegie Mellon University"),
+    (name: "Hao Kang", email: "haok@andrew.cmu.edu", affiliation: "Carnegie Mellon University"),
   ),
-  (
-    name: "Eugene Deklan",
-    affiliation: "Honduras State",
-    email: "e.deklan@hstate.hn",
-  ),
-))
+  // keywords: ("First keyword", "Second keyword", "etc."),
+  // date: "26 March 2025",
+)
+
+
 
 = Summary
 
