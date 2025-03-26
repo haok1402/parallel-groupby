@@ -1,8 +1,4 @@
-#import "/book.typ": book-page
-
-#show: book-page.with(title: "Proposal")
-
-
+// copy from typst.app
 
 
 #import "template.typ": docHeader
