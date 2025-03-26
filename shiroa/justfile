@@ -1,0 +1,8 @@
+serve:
+    shiroa serve
+
+build:
+    shiroa build --mode dyn-paged
+
+clean:
+    rm -rf dist
