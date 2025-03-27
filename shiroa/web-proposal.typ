@@ -22,5 +22,10 @@
 )
 #set table.hline(stroke: 0.4pt+black)
 #set table.vline(stroke: 0.4pt)
+#show figure.caption: it => {
+  set par(justify: false)
+  box(inset: (x: 0.1in, y:0in))[#it]
+}
 
 #include("proposal.typ")
+
