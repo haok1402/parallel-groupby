@@ -1,8 +1,8 @@
 serve:
-    shiroa serve
+    shiroa serve --theme ./themes/mdbook-mod
 
 build:
-    shiroa build --mode dyn-paged
+    shiroa build --mode dyn-paged --theme ./themes/mdbook-mod
 
 clean:
     rm -rf dist
