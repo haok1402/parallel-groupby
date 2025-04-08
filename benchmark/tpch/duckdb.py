@@ -23,7 +23,7 @@ PRAGMA enable_profiling;
 SET enable_profiling = 'json';
 SET profiling_output = '{}';
 
-PRAGMA tpch(1);
+PRAGMA tpch(5);
 """
 
 def main():
