@@ -1,3 +1,5 @@
-/data/*.db
-/report
-.vscode/sftp.json
+data/*.db
+report/**/*.json
+
+.vscode/
+venv/
