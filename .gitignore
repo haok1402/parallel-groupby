@@ -1,5 +1,6 @@
 data/*.db
 report/**/*.json
+report/**/*.pdf
 
 .vscode/
 venv/
