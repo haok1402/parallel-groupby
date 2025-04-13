@@ -5,7 +5,7 @@ from typing import DefaultDict, Tuple
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-def tpch_duckdb_speedup():
+def tpch_duckdb_speedup(limit: int = 64):
     record: DefaultDict[Path, Tuple[int, float]] = defaultdict(list)
     for file in Path("report").rglob("tpch-sf*/duckdb/*.json"):
         threads = int(file.stem)
@@ -14,6 +14,7 @@ def tpch_duckdb_speedup():
     sns.set_theme(style="whitegrid")
     for base, data in sorted(record.items()):
         threads, latency = zip(*sorted(data))
+        threads, latency = threads[:limit], latency[:limit]
         speedup = [latency[0] / t for t in latency]
         label = base.parent.as_posix().removeprefix("report/")
         sns.lineplot(x=threads, y=speedup, marker="o", label=label)
