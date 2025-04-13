@@ -3,4 +3,6 @@ report/**/*.json
 report/**/*.pdf
 
 .vscode/
+
 venv/
+build/
