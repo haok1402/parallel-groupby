@@ -21,7 +21,7 @@ SELECT l_orderkey, COUNT(*), SUM(l_extendedprice), AVG(l_discount) FROM lineitem
 
 def main():
     for database in Path("data").glob("tpch-sf*.db"):
-        for threads in range(os.cpu_count(), os.cpu_count() + 1):
+        for threads in range(1, os.cpu_count() + 1):
             outfile = Path("report", database.stem, "duckdb", str(threads))
             outfile.parent.mkdir(parents=True, exist_ok=True)
             logging.info(f"Running query on {database} with {threads} threads.")
