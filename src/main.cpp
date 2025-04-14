@@ -9,27 +9,10 @@ int main()
     duckdb::DuckDB db("data/tpch-sf1.db");
     duckdb::Connection con(db);
 
-    /**
-     * 2. Load the columns required for execution
-     */
-    auto result = con.Query("SELECT * FROM lineitem LIMIT 3;");
-    if (result->HasError())
-    {
-        std::cerr << result->GetError() << std::endl;
-        return 1;
-    }
+    std::string query = "SELECT l_orderkey, COUNT(*), SUM(l_extendedprice), AVG(l_discount) FROM lineitem GROUP BY l_orderkey";
 
-    while (auto chunk = result->Fetch())
-    {
-        std::cout << chunk->ToString() << std::endl;
-        auto value = chunk->GetValue(5, 2).GetValue<float>();
-        std::cout << "value: " << value << std::endl;
-        break;
-    }
-
-    /**
-     * 3. Execute the groupby query (i.e. our implementation)
-     */
+    auto root = con.ExtractPlan(query);
+    std::cout << root->ToString() << std::endl;
 
     return 0;
 }
