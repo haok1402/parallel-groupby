@@ -3,9 +3,15 @@
 
 int main()
 {
+    /**
+     * 1. Read the database
+     */
     duckdb::DuckDB db("data/tpch-sf1.db");
     duckdb::Connection con(db);
 
+    /**
+     * 2. Load the columns required for execution
+     */
     auto result = con.Query("SELECT * FROM lineitem;");
     if (result->HasError())
     {
@@ -13,12 +19,11 @@ int main()
         return 1;
     }
 
-    while (auto chunk = result->Fetch()) {
-        std::cout << "chunk->size() = " << chunk->size() << std::endl;
-        std::cout << "chunk->ColumnCount() = " << chunk->ColumnCount() << std::endl;
-    }
+    auto collection = result->Collection();
 
-    std::cout << "result->RowCount() = " << result->RowCount() << std::endl;
+    /**
+     * 3. Execute the groupby query (i.e. our implementation)
+     */
 
     return 0;
 }
