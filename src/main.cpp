@@ -21,6 +21,12 @@ int main()
 
     auto collection = result->Collection();
 
+    auto column_types = collection.Types();
+    for (duckdb::idx_t i = 0; i < column_types.size(); i++)
+    {
+        std::cout << "type: " << column_types[i].ToString() << std::endl;
+    }
+
     /**
      * 3. Execute the groupby query (i.e. our implementation)
      */
