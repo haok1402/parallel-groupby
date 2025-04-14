@@ -22,6 +22,8 @@ int main()
     while (auto chunk = result->Fetch())
     {
         std::cout << chunk->ToString() << std::endl;
+        auto value = chunk->GetValue(5, 2).GetValue<float>();
+        std::cout << "value: " << value << std::endl;
         break;
     }
 
