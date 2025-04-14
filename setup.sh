@@ -13,6 +13,9 @@ mv duckdb.h duckdb.hpp lib/duckdb/include/
 mkdir -p lib/duckdb/lib
 mv libduckdb.so libduckdb_static.a lib/duckdb/lib/
 
+python3 -m venv venv
+venv/bin/pip install -r requirements.txt
+
 # Download the dataset for benchmarking purposes.
 wget -P data/ https://blobs.duckdb.org/data/tpch-sf1.db
 wget -P data/ https://blobs.duckdb.org/data/tpch-sf10.db
