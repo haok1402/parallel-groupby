@@ -1,3 +1,4 @@
 /data/*.db
 /report
 .vscode/sftp.json
+.vscode/settings.json
