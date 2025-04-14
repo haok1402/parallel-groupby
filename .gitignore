@@ -1,8 +1,7 @@
-data/*.db
-report/**/*.json
-report/**/*.pdf
-
-.vscode/
-
+lib/
 venv/
 build/
+.vscode/
+
+data/
+report/
