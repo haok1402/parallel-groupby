@@ -12,19 +12,17 @@ int main()
     /**
      * 2. Load the columns required for execution
      */
-    auto result = con.Query("SELECT * FROM lineitem;");
+    auto result = con.Query("SELECT * FROM lineitem LIMIT 3;");
     if (result->HasError())
     {
         std::cerr << result->GetError() << std::endl;
         return 1;
     }
 
-    auto collection = result->Collection();
-
-    auto column_types = collection.Types();
-    for (duckdb::idx_t i = 0; i < column_types.size(); i++)
+    while (auto chunk = result->Fetch())
     {
-        std::cout << "type: " << column_types[i].ToString() << std::endl;
+        std::cout << chunk->ToString() << std::endl;
+        break;
     }
 
     /**
