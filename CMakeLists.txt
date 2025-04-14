@@ -6,6 +6,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 add_definitions(-D_GLIBCXX_USE_CXX11_ABI=0)
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
+
 add_executable(main src/main.cpp)
 
 include_directories(${CMAKE_SOURCE_DIR}/lib/duckdb/include)
