@@ -1,0 +1,6 @@
+bench-polars:
+    python bench_polars.py -np 1 -i ../data/gen_v1_1000000_10000.parquet 2> /dev/null
+    python bench_polars.py -np 2 -i ../data/gen_v1_1000000_10000.parquet 2> /dev/null
+    python bench_polars.py -np 4 -i ../data/gen_v1_1000000_10000.parquet 2> /dev/null
+    python bench_polars.py -np 8 -i ../data/gen_v1_1000000_10000.parquet 2> /dev/null
+    python bench_polars.py -np 16 -i ../data/gen_v1_1000000_10000.parquet 2> /dev/null
