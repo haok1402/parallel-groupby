@@ -8,7 +8,7 @@
 #include <string>
 #include <utility>
 #include "CLI11.hpp"
-#include "duckdb/main/settings.hpp"
+
 typedef std::chrono::time_point<std::chrono::steady_clock> chrono_time_point;
 
 struct Entry {
