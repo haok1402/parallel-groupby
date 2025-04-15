@@ -12,3 +12,8 @@ report/
 src-rs/target
 CMakeFiles
 CMakeCache.txt
+main
+.clangd
+cmake_install.cmake
+Makefile
+out1.csv
