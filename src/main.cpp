@@ -32,7 +32,7 @@ enum class Strategy {
     SEQUENTIAL,
     GLOBAL_LOCK,
     TWO_PHASE_CENTRALIZED_MERGE,
-    SIMPLE_THREE_PHASE_RADIX,
+    SIMPLE_TWO_PHASE_RADIX,
 };
 
 // experiment config, including input file, what to group, what to aggregate, etc.
@@ -164,9 +164,10 @@ void load_data(ExpConfig &config, RowStore &table) {
 }
 
 typedef std::array<int64_t, 2> AggMapValue; // TODO is there a way to not hard code the size?
+typedef std::array<int64_t, 2+1> AggResRow;   // TODO is there a way to not hard code the size?
 
 // requires table to be populated and in memory
-void sequential_sol(ExpConfig &config, RowStore &table, int trial_idx) {
+void sequential_sol(ExpConfig &config, RowStore &table, int trial_idx, std::vector<AggResRow> &agg_res) {
     assert(table.n_rows > 0);
     assert(table.n_cols > 0);
     
@@ -205,7 +206,7 @@ void sequential_sol(ExpConfig &config, RowStore &table, int trial_idx) {
 
 typedef std::chrono::time_point<std::chrono::steady_clock> chrono_time_point;
 
-void naive_2phase_centralised_merge_sol(ExpConfig &config, RowStore &table, int trial_idx) {
+void naive_2phase_centralised_merge_sol(ExpConfig &config, RowStore &table, int trial_idx, std::vector<AggResRow> &agg_res) {
     omp_set_num_threads(config.num_threads);
     
     auto n_cols = table.n_cols;
@@ -301,10 +302,10 @@ void naive_2phase_centralised_merge_sol(ExpConfig &config, RowStore &table, int 
 
 }
 
+// approach: go directly into radix partition when scanning
 // phase 1: independent local scans directly into radix partitioning, with num partitions = num threads
 // phase 2: independently, each thread merges one partition
-// phase 3: thread 0 combine results without any probing
-void simple_3phase_radix_partition_sol(ExpConfig &config, RowStore &table, int trial_idx) {
+void simple_2phase_radix_partition_sol(ExpConfig &config, RowStore &table, int trial_idx, std::vector<AggResRow> &agg_res) {
     omp_set_num_threads(config.num_threads);
     
     auto n_cols = table.n_cols;
@@ -312,18 +313,21 @@ void simple_3phase_radix_partition_sol(ExpConfig &config, RowStore &table, int t
 
     chrono_time_point t_overall_0;
     chrono_time_point t_overall_1;
+    chrono_time_point t_agg_0;
+    chrono_time_point t_agg_1;
     chrono_time_point t_phase1_0;
     chrono_time_point t_phase1_1;
     chrono_time_point t_phase2_0;
     chrono_time_point t_phase2_1;
-    chrono_time_point t_phase3_0;
-    chrono_time_point t_phase3_1;
-    
+    chrono_time_point t_output_0;
+    chrono_time_point t_output_1;
+
     t_overall_0 = std::chrono::steady_clock::now();
+    t_agg_0 = std::chrono::steady_clock::now();
 
     // auto local_agg_maps = std::vector<std::unordered_map<int64_t, AggMapValue>>(config.num_threads);
     // assert(local_agg_maps.size() == config.num_threads);
-    std::unordered_map<int64_t, AggMapValue> agg_map; // where merged results go
+    // std::unordered_map<int64_t, AggMapValue> agg_map; // where merged results go
     
     int n_bits_for_radix = round(log2(config.num_threads));
     assert (0x1 << n_bits_for_radix == config.num_threads);
@@ -378,7 +382,7 @@ void simple_3phase_radix_partition_sol(ExpConfig &config, RowStore &table, int t
         
         if (tid == 0) {
             t_phase1_1 = std::chrono::steady_clock::now();
-            std::cout << ">> Phase 1 time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_phase1_1 - t_phase1_0).count() << " ms" << std::endl;
+            std::cout << ">> phase 1 time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_phase1_1 - t_phase1_0).count() << " ms" << std::endl;
         }
 
         // === PHASE 2: local aggregation map === 
@@ -409,36 +413,41 @@ void simple_3phase_radix_partition_sol(ExpConfig &config, RowStore &table, int t
         
         if (tid == 0) {
             t_phase2_1 = std::chrono::steady_clock::now();
-            std::cout << ">> Phase 2 time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_phase2_1 - t_phase2_0).count() << " ms" << std::endl;
+            std::cout << ">> phase 2 time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_phase2_1 - t_phase2_0).count() << " ms" << std::endl;
         }
 
-        // === PHASE 3: thread 0 combine results without any probing === 
-
-        if (tid == 0) {
-            t_phase3_0 = std::chrono::steady_clock::now();
-            
-            agg_map = std::move(radix_partitions_local_maps[0][0]);
-            
-            for (size_t part_idx = 1; part_idx < n_partitions; part_idx++) {
-                agg_map.merge(radix_partitions_local_maps[part_idx][0]);
+    }
+    
+    t_agg_1 = std::chrono::steady_clock::now();
+    std::cout << ">>> aggregation time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_agg_1 - t_agg_0).count() << " ms" << std::endl;
+    
+    // === PHASE 3: one thread write out the result === 
+    {
+        t_output_0 = std::chrono::steady_clock::now();
+        
+        // agg_map = std::move(radix_partitions_local_maps[0][0]);
+        
+        for (size_t part_idx = 0; part_idx < n_partitions; part_idx++) {
+            // agg_map.merge(radix_partitions_local_maps[part_idx][0]);
+            for (auto& [group_key, agg_acc] : radix_partitions_local_maps[part_idx][0]) {
+                agg_res.push_back(AggResRow{group_key, agg_acc[0], agg_acc[1]});
             }
-            
-            t_phase3_1 = std::chrono::steady_clock::now();
-            std::cout << ">> Phase 3 time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_phase3_1 - t_phase3_0).count() << " ms" << std::endl;
-
         }
+        
+        t_output_1 = std::chrono::steady_clock::now();
+        std::cout << ">> write output: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_output_1 - t_output_0).count() << " ms" << std::endl;
     }
     
     t_overall_1 = std::chrono::steady_clock::now();
     std::cout << ">>> elapsed time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_overall_1 - t_overall_0).count() << " ms" << std::endl;
     // spot checking
-    std::cout << 419 << " -> (" << agg_map[419][0] << ", " << agg_map[419][1] << ")" << std::endl;
-    std::cout << 3488 << " -> (" << agg_map[3488][0] << ", " << agg_map[3488][1] << ")" << std::endl;
-    std::cout << 5997667 << " -> (" << agg_map[5997667][0] << ", " << agg_map[5997667][1] << ")" << std::endl;
+    // std::cout << 419 << " -> (" << agg_map[419][0] << ", " << agg_map[419][1] << ")" << std::endl;
+    // std::cout << 3488 << " -> (" << agg_map[3488][0] << ", " << agg_map[3488][1] << ")" << std::endl;
+    // std::cout << 5997667 << " -> (" << agg_map[5997667][0] << ", " << agg_map[5997667][1] << ")" << std::endl;
 
 }
 
-void dumb_global_lock_sol(ExpConfig &config, RowStore &table, int trial_idx) {
+void dumb_global_lock_sol(ExpConfig &config, RowStore &table, int trial_idx, std::vector<AggResRow> &agg_res) {
     omp_set_num_threads(config.num_threads);
     
     auto n_cols = table.n_cols;
@@ -446,8 +455,13 @@ void dumb_global_lock_sol(ExpConfig &config, RowStore &table, int trial_idx) {
 
     chrono_time_point t_overall_0;
     chrono_time_point t_overall_1;
-    
+    chrono_time_point t_agg_0;
+    chrono_time_point t_agg_1;
+    chrono_time_point t_output_0;
+    chrono_time_point t_output_1;
+
     t_overall_0 = std::chrono::steady_clock::now();
+    t_agg_0 = std::chrono::steady_clock::now();
 
     std::unordered_map<int64_t, AggMapValue> agg_map;
     
@@ -478,13 +492,32 @@ void dumb_global_lock_sol(ExpConfig &config, RowStore &table, int trial_idx) {
         }
     }
     
-    t_overall_1 = std::chrono::steady_clock::now();
-    std::cout << ">>> elapsed time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_overall_1 - t_overall_0).count() << " ms" << std::endl;
-    // spot checking
-    std::cout << 419 << " -> (" << agg_map[419][0] << ", " << agg_map[419][1] << ")" << std::endl;
-    std::cout << 3488 << " -> (" << agg_map[3488][0] << ", " << agg_map[3488][1] << ")" << std::endl;
-    std::cout << 5997667 << " -> (" << agg_map[5997667][0] << ", " << agg_map[5997667][1] << ")" << std::endl;
+    t_agg_1 = std::chrono::steady_clock::now();
+    std::cout << ">>> aggregation time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_agg_1 - t_agg_0).count() << " ms" << std::endl;
 
+    {
+        t_output_0 = std::chrono::steady_clock::now();
+
+        // write output
+        for (auto& [group_key, agg_acc] : agg_map) {
+            agg_res.push_back(AggResRow{group_key, agg_acc[0], agg_acc[1]});
+        }
+        
+        t_output_1 = std::chrono::steady_clock::now();
+        std::cout << ">> write output: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_output_1 - t_output_0).count() << " ms" << std::endl;
+    }
+    
+    t_overall_1 = std::chrono::steady_clock::now();
+    
+    std::cout << ">>> elapsed time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_overall_1 - t_overall_0).count() << " ms" << std::endl;
+}
+
+void print_spotcheck(std::vector<AggResRow> agg_res) {
+    for (const auto& row : agg_res) {
+        if (row[0] == 419 || row[0] == 3488 || row[0] == 5997667) { // spot checking
+            std::cout << row[0] << " -> (" << row[1] << ", " << row[2] << ")" << std::endl;
+        }
+    }
 }
 
 int main(int argc, char *argv[]) {
@@ -494,8 +527,8 @@ int main(int argc, char *argv[]) {
     // set defaults
     ExpConfig config;
     config.num_threads = 1;
-    config.num_dryruns = 1;
-    config.num_trials = 3;
+    config.num_dryruns = 0;
+    config.num_trials = 1;
     config.batch_size = 10000;
     config.strategy = Strategy::SEQUENTIAL;
     config.in_db_file_path = "data/tpch-sf1.db";
@@ -522,8 +555,8 @@ int main(int argc, char *argv[]) {
         config.strategy = Strategy::GLOBAL_LOCK;
     } else if (strat_str == "TWO_PHASE_CENTRALIZED_MERGE") {
         config.strategy = Strategy::TWO_PHASE_CENTRALIZED_MERGE;
-    } else if (strat_str == "SIMPLE_THREE_PHASE_RADIX") {
-        config.strategy = Strategy::SIMPLE_THREE_PHASE_RADIX;
+    } else if (strat_str == "SIMPLE_TWO_PHASE_RADIX") {
+        config.strategy = Strategy::SIMPLE_TWO_PHASE_RADIX;
     } else {
         throw std::runtime_error("Unsupported strategy");
     }
@@ -534,16 +567,17 @@ int main(int argc, char *argv[]) {
     
     RowStore table;
     load_data(config, table);
+    std::vector<AggResRow> agg_res; // where to write results to
     
-    auto run_once = [&](int run_idx) {
+    auto run_once = [&](int run_idx, std::vector<AggResRow>& agg_res) {
         if (config.strategy == Strategy::SEQUENTIAL) {
-            sequential_sol(config, table, run_idx);
+            sequential_sol(config, table, run_idx, agg_res);
         } else if (config.strategy == Strategy::GLOBAL_LOCK) {
-            dumb_global_lock_sol(config, table, run_idx);
+            dumb_global_lock_sol(config, table, run_idx, agg_res);
         } else if (config.strategy == Strategy::TWO_PHASE_CENTRALIZED_MERGE) {
-            naive_2phase_centralised_merge_sol(config, table, run_idx);
-        } else if (config.strategy == Strategy::SIMPLE_THREE_PHASE_RADIX) {
-            simple_3phase_radix_partition_sol(config, table, run_idx);
+            naive_2phase_centralised_merge_sol(config, table, run_idx, agg_res);
+        } else if (config.strategy == Strategy::SIMPLE_TWO_PHASE_RADIX) {
+            simple_2phase_radix_partition_sol(config, table, run_idx, agg_res);
         } else {
             throw std::runtime_error("Unsupported strategy");
         }
@@ -552,12 +586,17 @@ int main(int argc, char *argv[]) {
     // 3 > run the experiment
     for (int dryrun_idx = 0; dryrun_idx < config.num_dryruns; dryrun_idx++) {
         printf(">>> running dryrun %d\n", dryrun_idx);
-        run_once(dryrun_idx);
+        run_once(dryrun_idx, agg_res);
+        if (dryrun_idx == 0) {
+            print_spotcheck(agg_res);
+        }
+        agg_res.clear();
     }
 
     for (int trial_idx = 0; trial_idx < config.num_trials; trial_idx++) {
         printf(">>> running trial %d\n", trial_idx);
-        run_once(trial_idx);
+        run_once(trial_idx, agg_res);
+        agg_res.clear();
     }
     
     return 0;
