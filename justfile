@@ -1,13 +1,16 @@
 
 # - engine choices are duckdb, polars for now
 # - dbfile should point to a duckdb database file
-bench engine="duckdb" dbfile="data/tpch-sf1.db":
+bench engine="duckdb" max_core="8" dbfile="data/tpch-sf1.db":
     #!/bin/bash
     dbfile={{dbfile}}
     engine={{engine}}
+    max_core={{max_core}}
     echo "--- 🧪 benchmark $engine on $dbfile ---"
-    # for np in 1 2 4 8 16 32 64 128; do
-    for np in 1; do
+    for np in 1 2 4 8 16 32 64 128; do
+        if [[ $np -gt $max_core ]]; then
+            continue
+        fi
         echo "> benchmarking with $np cores"
         python benchmark/bench.py -np $np -i $dbfile -q -e $engine
     done
