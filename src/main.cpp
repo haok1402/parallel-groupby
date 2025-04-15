@@ -275,13 +275,13 @@ void naive_2phase_centralised_merge_sol(ExpConfig &config, RowStore &table) {
                     AggMapValue agg_acc;
                     if (auto search = agg_map.find(group_key); search != agg_map.end()) {
                         agg_acc = search->second;
+                        for (size_t c = 1; c < n_cols; c++) {
+                            agg_acc[c - 1] = agg_acc[c - 1] + other_agg_acc[c - 1];
+                        }
                     } else {
-                        agg_acc = AggMapValue{0, 0};
+                        agg_acc = other_agg_acc;
                     }
-                    for (size_t c = 1; c < n_cols; c++) {
-                        agg_acc[c - 1] = agg_acc[c - 1] + other_agg_acc[c - 1];
-                    }
-                    local_agg_map[group_key] = agg_acc;
+                    agg_map[group_key] = agg_acc;
                 }
             }
             
@@ -357,7 +357,7 @@ int main(int argc, char *argv[]) {
     ExpConfig config;
     config.num_threads = 1;
     config.batch_size = 10000;
-    config.strategy = Strategy::GLOBAL_LOCK;
+    config.strategy = Strategy::SEQUENTIAL;
     config.in_db_file_path = "data/tpch-sf1.db";
     config.in_table_name = "lineitem";
     config.group_key_col_name = "l_orderkey";
@@ -365,8 +365,27 @@ int main(int argc, char *argv[]) {
     config.agg_funcs = {AggFunc::SUM, AggFunc::SUM};
     
     CLI::App app{"Whatever"};
-    app.add_option("--num_threads", config.num_threads, "num threads");
+    
+    app.add_option("--num_threads", config.num_threads);
+    app.add_option("--batch_size", config.batch_size);
+    std::string strat_str = "SEQUENTIAL";
+    app.add_option("--strategy", strat_str);
+    app.add_option("--in_db_file_path", config.in_db_file_path);
+    app.add_option("--in_table_name", config.in_table_name);
+    // app.add_option("--group_key_col_name", config.group_key_col_name);
+    
     CLI11_PARSE(app, argc, argv);
+
+    if (strat_str == "SEQUENTIAL") {
+        config.strategy = Strategy::SEQUENTIAL;
+    } else if (strat_str == "GLOBAL_LOCK") {
+        config.strategy = Strategy::GLOBAL_LOCK;
+    } else if (strat_str == "TWO_PHASE_CENTRALIZED_MERGE") {
+        config.strategy = Strategy::TWO_PHASE_CENTRALIZED_MERGE;
+    } else {
+        throw std::runtime_error("Unsupported strategy");
+    }
+
     config.display();
     
     // 2 > load the data
