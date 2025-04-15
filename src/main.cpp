@@ -14,10 +14,10 @@ struct Entry {
     int64_t l_suppkey;
 };
 
-struct AggMapValue {
-    int64_t v1;
-    int64_t v2;
-};
+// struct AggMapValue {
+//     int64_t v1;
+//     int64_t v2;
+// };
 
 
 enum class AggFunc {
@@ -64,16 +64,19 @@ public:
 };
 
 // column major data storage
+// usage: first reserve all memory, then write to each cell
 class ColumnStore {
 public:
-    std::vector<int64_t> data; 
+    // std::vector<int64_t> data; 
+    int64_t* data; 
     int n_cols;
     int n_rows;
     
     void init_table(int num_cols, int num_rows) {
         n_cols = num_cols;
         n_rows = num_rows;
-        data.resize(num_cols * num_rows);
+        // data.resize(num_cols * num_rows);
+        data = new int64_t[num_cols * num_rows];
     }
     
     inline int get_idx(int row_idx, int col_idx) {
@@ -92,14 +95,16 @@ public:
 
 class RowStore {
 public:
-    std::vector<int64_t> data; // everything back to back in same chunk of meomry
+    // std::vector<int64_t> data;
+    int64_t* data; 
     int n_cols;
     int n_rows;
     
     void init_table(int num_cols, int num_rows) {
         n_cols = num_cols;
         n_rows = num_rows;
-        data.resize(num_cols * num_rows);
+        // data.resize(num_cols * num_rows);
+        data = new int64_t[num_cols * num_rows];
     }
     
     inline int get_idx(int row_idx, int col_idx) {
@@ -118,7 +123,7 @@ public:
 
 // using config specification, load stuff into table
 // for now, assume one group column, and group key column is not any of the value columns
-void load_data(ExpConfig &config, ColumnStore &table) {
+void load_data(ExpConfig &config, RowStore &table) {
     duckdb::DuckDB db(config.in_db_file_path);
     duckdb::Connection con(db);
     
@@ -150,8 +155,10 @@ void load_data(ExpConfig &config, ColumnStore &table) {
     std::cout << "table.n_cols = " << table.n_cols << std::endl;
 }
 
+typedef std::array<int64_t, 2> AggMapValue; // TODO is there a way to not hard code the size?
+
 // requires table to be populated and in memory
-void sequential_sol(ExpConfig &config, ColumnStore &table) {
+void sequential_sol(ExpConfig &config, RowStore &table) {
     assert(table.n_rows > 0);
     assert(table.n_cols > 0);
     
@@ -161,29 +168,22 @@ void sequential_sol(ExpConfig &config, ColumnStore &table) {
     
     auto t0 = std::chrono::steady_clock::now();
 
-    // groupby with just some map
-    std::unordered_map<int64_t, std::array<int64_t, 2>> agg_map;
-    // std::unordered_map<int64_t, AggMapValue> agg_map;
-
+    std::unordered_map<int64_t, AggMapValue> agg_map;
     for (size_t r = 0; r < n_rows; r++) {
         auto group_key = table.get(r, 0);
         
         // find existing entry, if not initialise
-        std::vector<duckdb::Value> existing;
+        AggMapValue agg_acc;
         if (auto search = agg_map.find(group_key); search != agg_map.end()) {
+            agg_acc = search->second;
         } else {
-            // key |-> entry of all 0s
-            auto existing = std::array<int64_t, 2>{0, 0};
-            // auto existing = AggMapValue{0, 0};
-            agg_map[group_key] = existing;
+            agg_acc = AggMapValue{0, 0};
         }
 
         for (size_t c = 1; c < n_cols; c++) {
-            if (c == 0) continue;
-            agg_map[group_key][c - 1] = agg_map[group_key][c - 1] + table.get(r, c);
+            agg_acc[c - 1] = agg_acc[c - 1] + table.get(r, c);
         }
-        // agg_map[group_key].v1 = agg_map[group_key].v1 + table.get(r, 1);
-        // agg_map[group_key].v2 = agg_map[group_key].v2 + table.get(r, 2);
+        agg_map[group_key] = agg_acc;
     }
 
     auto t1 = std::chrono::steady_clock::now();
@@ -218,7 +218,7 @@ int main(int argc, char *argv[]) {
     config.display();
     
     // 2 > load the data
-    ColumnStore table;
+    RowStore table;
     load_data(config, table);
     
     // 3 > run the experiment
