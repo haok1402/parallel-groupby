@@ -23,3 +23,11 @@ build-cpp:
 
 run-cpp: build-cpp
     ./main
+
+[working-directory: 'src-go']
+@run-go:
+    go run main.go
+
+[working-directory: 'src-rs']
+@run-rs:
+    cargo run --release
