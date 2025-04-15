@@ -22,7 +22,13 @@ build-cpp:
     make
 
 run-cpp: build-cpp
-    ./main
+    ./main --num_threads 1
+
+tmp-run-cpp-bench: build-cpp
+    ./main --num_threads 1
+    ./main --num_threads 2
+    ./main --num_threads 4
+    ./main --num_threads 8
 
 [working-directory: 'src-go']
 @run-go:
