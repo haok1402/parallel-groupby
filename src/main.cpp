@@ -8,6 +8,7 @@
 #include <string>
 #include <utility>
 #include "CLI11.hpp"
+typedef std::chrono::time_point<std::chrono::steady_clock> chrono_time_point;
 
 struct Entry {
     int64_t l_orderkey;
@@ -173,9 +174,19 @@ void sequential_sol(ExpConfig &config, RowStore &table, int trial_idx, std::vect
     
     auto n_cols = table.n_cols;
     auto n_rows = table.n_rows;
+
+    
     assert(n_cols == 3); // how to support dynamic col count?
     
-    auto t0 = std::chrono::steady_clock::now();
+    chrono_time_point t_overall_0;
+    chrono_time_point t_overall_1;
+    chrono_time_point t_agg_0;
+    chrono_time_point t_agg_1;
+    chrono_time_point t_output_0;
+    chrono_time_point t_output_1;
+
+    t_overall_0 = std::chrono::steady_clock::now();
+    t_agg_0 = std::chrono::steady_clock::now();
 
     std::unordered_map<int64_t, AggMapValue> agg_map;
     for (size_t r = 0; r < n_rows; r++) {
@@ -194,9 +205,24 @@ void sequential_sol(ExpConfig &config, RowStore &table, int trial_idx, std::vect
         }
         agg_map[group_key] = agg_acc;
     }
+    
+    t_agg_1 = std::chrono::steady_clock::now();
+    std::cout << ">>> aggregation time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_agg_1 - t_agg_0).count() << " ms" << std::endl;
 
-    auto t1 = std::chrono::steady_clock::now();
-    std::cout << ">>> elapsed time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << " ms" << std::endl;
+    {
+        t_output_0 = std::chrono::steady_clock::now();
+
+        // write output
+        for (auto& [group_key, agg_acc] : agg_map) {
+            agg_res.push_back(AggResRow{group_key, agg_acc[0], agg_acc[1]});
+        }
+        
+        t_output_1 = std::chrono::steady_clock::now();
+        std::cout << ">> write output: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_output_1 - t_output_0).count() << " ms" << std::endl;
+    }
+
+    t_overall_1 = std::chrono::steady_clock::now();
+    std::cout << ">>> elapsed time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_overall_1 - t_overall_0).count() << " ms" << std::endl;
 
     // spot checking
     std::cout << 419 << " -> (" << agg_map[419][0] << ", " << agg_map[419][1] << ")" << std::endl;
@@ -204,7 +230,6 @@ void sequential_sol(ExpConfig &config, RowStore &table, int trial_idx, std::vect
     std::cout << 5997667 << " -> (" << agg_map[5997667][0] << ", " << agg_map[5997667][1] << ")" << std::endl;
 }
 
-typedef std::chrono::time_point<std::chrono::steady_clock> chrono_time_point;
 
 void naive_2phase_centralised_merge_sol(ExpConfig &config, RowStore &table, int trial_idx, std::vector<AggResRow> &agg_res) {
     omp_set_num_threads(config.num_threads);
@@ -218,8 +243,14 @@ void naive_2phase_centralised_merge_sol(ExpConfig &config, RowStore &table, int 
     chrono_time_point t_phase1_1;
     chrono_time_point t_phase2_0;
     chrono_time_point t_phase2_1;
+    chrono_time_point t_agg_0;
+    chrono_time_point t_agg_1;
+    chrono_time_point t_output_0;
+    chrono_time_point t_output_1;
+
     
     t_overall_0 = std::chrono::steady_clock::now();
+    t_agg_0 = std::chrono::steady_clock::now();
 
     auto local_agg_maps = std::vector<std::unordered_map<int64_t, AggMapValue>>(config.num_threads);
     assert(local_agg_maps.size() == config.num_threads);
@@ -261,7 +292,7 @@ void naive_2phase_centralised_merge_sol(ExpConfig &config, RowStore &table, int 
         
         if (tid == 0) {
             t_phase1_1 = std::chrono::steady_clock::now();
-            std::cout << ">> Phase 1 time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_phase1_1 - t_phase1_0).count() << " ms" << std::endl;
+            std::cout << ">> phase 1 time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_phase1_1 - t_phase1_0).count() << " ms" << std::endl;
         }
 
         // PHASE 2: thread 0 merges results
@@ -288,17 +319,28 @@ void naive_2phase_centralised_merge_sol(ExpConfig &config, RowStore &table, int 
             }
             
             t_phase2_1 = std::chrono::steady_clock::now();
-            std::cout << ">> Phase 2 time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_phase2_1 - t_phase2_0).count() << " ms" << std::endl;
+            std::cout << ">> phase 2 time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_phase2_1 - t_phase2_0).count() << " ms" << std::endl;
 
         }
     }
     
+    t_agg_1 = std::chrono::steady_clock::now();
+    std::cout << ">>> aggregation time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_agg_1 - t_agg_0).count() << " ms" << std::endl;
+    
+    {
+        t_output_0 = std::chrono::steady_clock::now();
+
+        // write output
+        for (auto& [group_key, agg_acc] : agg_map) {
+            agg_res.push_back(AggResRow{group_key, agg_acc[0], agg_acc[1]});
+        }
+        
+        t_output_1 = std::chrono::steady_clock::now();
+        std::cout << ">> write output: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_output_1 - t_output_0).count() << " ms" << std::endl;
+    }
+    
     t_overall_1 = std::chrono::steady_clock::now();
     std::cout << ">>> elapsed time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_overall_1 - t_overall_0).count() << " ms" << std::endl;
-    // spot checking
-    std::cout << 419 << " -> (" << agg_map[419][0] << ", " << agg_map[419][1] << ")" << std::endl;
-    std::cout << 3488 << " -> (" << agg_map[3488][0] << ", " << agg_map[3488][1] << ")" << std::endl;
-    std::cout << 5997667 << " -> (" << agg_map[5997667][0] << ", " << agg_map[5997667][1] << ")" << std::endl;
 
 }
 
