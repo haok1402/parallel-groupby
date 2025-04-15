@@ -417,7 +417,9 @@ void simple_3phase_radix_partition_sol(ExpConfig &config, RowStore &table, int t
         if (tid == 0) {
             t_phase3_0 = std::chrono::steady_clock::now();
             
-            for (size_t part_idx = 0; part_idx < n_partitions; part_idx++) {
+            agg_map = std::move(radix_partitions_local_maps[0][0]);
+            
+            for (size_t part_idx = 1; part_idx < n_partitions; part_idx++) {
                 agg_map.merge(radix_partitions_local_maps[part_idx][0]);
             }
             
