@@ -3,10 +3,12 @@
 #include <cassert>
 #include <chrono>
 #include <csignal>
+#include <ctime>
 #include <duckdb.hpp>
 #include <iostream>
 #include <omp.h>
 #include <string>
+#include <utility>
 
 struct Entry {
     int64_t l_orderkey;
@@ -36,6 +38,7 @@ enum class Strategy {
 class ExpConfig {
 public:
     int num_threads;
+    int batch_size;
     Strategy strategy;
     std::string in_db_file_path;
     std::string in_table_name;
@@ -46,6 +49,7 @@ public:
     void display() {
         std::cout << "exp config:" << std::endl;
         std::cout << "num_threads = " << num_threads << std::endl;
+        std::cout << "batch_size = " << batch_size << std::endl;
         std::cout << "strategy = " << ((int) strategy) << std::endl;
         std::cout << "in_db_file_path = " << in_db_file_path << std::endl;
         std::cout << "in_table_name = " << in_table_name << std::endl;
@@ -189,17 +193,108 @@ void sequential_sol(ExpConfig &config, RowStore &table) {
     auto t1 = std::chrono::steady_clock::now();
     std::cout << "Elapsed time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << " ms" << std::endl;
 
+    // spot checking
+    std::cout << 419 << " -> (" << agg_map[419][0] << ", " << agg_map[419][1] << ")" << std::endl;
+    std::cout << 3488 << " -> (" << agg_map[3488][0] << ", " << agg_map[3488][1] << ")" << std::endl;
+    std::cout << 5997667 << " -> (" << agg_map[5997667][0] << ", " << agg_map[5997667][1] << ")" << std::endl;
 }
 
-void hello_omp() {
-    int num_threads = 8;
-    omp_set_num_threads(num_threads);
+typedef std::chrono::time_point<std::chrono::steady_clock> chrono_time_point;
+
+void naive_2phase_centralised_merge_sol(ExpConfig &config, RowStore &table) {
+    omp_set_num_threads(config.num_threads);
+    
+    auto n_cols = table.n_cols;
+    auto n_rows = table.n_rows;
+
+    chrono_time_point t_overall_0;
+    chrono_time_point t_overall_1;
+    chrono_time_point t_phase1_0;
+    chrono_time_point t_phase1_1;
+    chrono_time_point t_phase2_0;
+    chrono_time_point t_phase2_1;
+    
+    t_overall_0 = std::chrono::steady_clock::now();
+
+    auto local_agg_maps = std::vector<std::unordered_map<int64_t, AggMapValue>>(config.num_threads);
+    assert(local_agg_maps.size() == config.num_threads);
+    std::unordered_map<int64_t, AggMapValue> agg_map; // where merged results go
+    
     #pragma omp parallel
     {
         int tid = omp_get_thread_num();
         int actual_num_threads = omp_get_num_threads();
-        printf("hello from thread %d among %d threads\n", tid, actual_num_threads);
+        // printf("hello from thread %d among %d threads\n", tid, actual_num_threads);
+        assert(actual_num_threads == config.num_threads);
+        
+        // PHASE 1: local aggregation map
+        std::unordered_map<int64_t, AggMapValue> local_agg_map;
+        
+        if (tid == 0) {
+            t_phase1_0 = std::chrono::steady_clock::now();
+        }
+        
+        // #pragma omp for schedule(dynamic, config.batch_size)
+        #pragma omp for schedule(static)
+        for (size_t r = 0; r < n_rows; r++) {
+            auto group_key = table.get(r, 0);
+            AggMapValue agg_acc;
+            if (auto search = local_agg_map.find(group_key); search != local_agg_map.end()) {
+                agg_acc = search->second;
+            } else {
+                agg_acc = AggMapValue{0, 0};
+            }
+    
+            for (size_t c = 1; c < n_cols; c++) {
+                agg_acc[c - 1] = agg_acc[c - 1] + table.get(r, c);
+            }
+            local_agg_map[group_key] = agg_acc;
+        }
+        local_agg_maps[tid] = local_agg_map;
+        
+        #pragma omp barrier
+        
+        if (tid == 0) {
+            t_phase1_1 = std::chrono::steady_clock::now();
+            std::cout << "Phase 1 time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_phase1_1 - t_phase1_0).count() << " ms" << std::endl;
+        }
+
+        // PHASE 2: thread 0 merges results
+        if (tid == 0) {
+            t_phase2_0 = std::chrono::steady_clock::now();
+            
+            agg_map = std::move(local_agg_maps[0]);
+            
+            for (int other_tid = 1; other_tid < actual_num_threads; other_tid++) {
+                auto other_local_agg_map = local_agg_maps[other_tid];
+                
+                for (const auto& [group_key, other_agg_acc] : other_local_agg_map) {
+                    AggMapValue agg_acc;
+                    if (auto search = agg_map.find(group_key); search != agg_map.end()) {
+                        agg_acc = search->second;
+                    } else {
+                        agg_acc = AggMapValue{0, 0};
+                    }
+                    for (size_t c = 1; c < n_cols; c++) {
+                        agg_acc[c - 1] = agg_acc[c - 1] + other_agg_acc[c - 1];
+                    }
+                    local_agg_map[group_key] = agg_acc;
+                }
+            }
+            
+            t_phase2_1 = std::chrono::steady_clock::now();
+            std::cout << "Phase 2 time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_phase2_1 - t_phase2_0).count() << " ms" << std::endl;
+
+        }
     }
+    
+    t_overall_1 = std::chrono::steady_clock::now();
+    std::cout << "Elapsed time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_overall_1 - t_overall_0).count() << " ms" << std::endl;
+    // spot checking
+    std::cout << 419 << " -> (" << agg_map[419][0] << ", " << agg_map[419][1] << ")" << std::endl;
+    std::cout << 3488 << " -> (" << agg_map[3488][0] << ", " << agg_map[3488][1] << ")" << std::endl;
+    std::cout << 5997667 << " -> (" << agg_map[5997667][0] << ", " << agg_map[5997667][1] << ")" << std::endl;
+
 }
 
 int main(int argc, char *argv[]) {
@@ -208,8 +303,9 @@ int main(int argc, char *argv[]) {
     
     // make a ExpConfig TODO parse from cli instead
     ExpConfig config;
-    config.num_threads = 8;
-    config.strategy = Strategy::SEQUENTIAL;
+    config.num_threads = 2;
+    config.batch_size = 10000;
+    config.strategy = Strategy::TWO_PHASE_CENTRALIZED_MERGE;
     config.in_db_file_path = "data/tpch-sf1.db";
     config.in_table_name = "lineitem";
     config.group_key_col_name = "l_orderkey";
@@ -218,6 +314,7 @@ int main(int argc, char *argv[]) {
     config.display();
     
     // 2 > load the data
+    
     RowStore table;
     load_data(config, table);
     
@@ -225,7 +322,7 @@ int main(int argc, char *argv[]) {
     if (config.strategy == Strategy::SEQUENTIAL) {
         sequential_sol(config, table);
     } else if (config.strategy == Strategy::TWO_PHASE_CENTRALIZED_MERGE) {
-        hello_omp();
+        naive_2phase_centralised_merge_sol(config, table);
     } else {
         throw std::runtime_error("Unsupported strategy");
     }
