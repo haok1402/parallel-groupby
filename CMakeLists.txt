@@ -19,3 +19,5 @@ else()
     include_directories(${CMAKE_SOURCE_DIR}/lib/duckdb/include)
     target_link_libraries(main ${CMAKE_SOURCE_DIR}/lib/duckdb/lib/libduckdb.so)
 endif()
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
