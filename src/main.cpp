@@ -235,7 +235,7 @@ void naive_2phase_centralised_merge_sol(ExpConfig &config, RowStore &table) {
         }
         
         // #pragma omp for schedule(dynamic, config.batch_size)
-        #pragma omp for schedule(static)
+        #pragma omp for schedule(static, config.batch_size)
         for (size_t r = 0; r < n_rows; r++) {
             auto group_key = table.get(r, 0);
             AggMapValue agg_acc;
@@ -303,7 +303,7 @@ int main(int argc, char *argv[]) {
     
     // make a ExpConfig TODO parse from cli instead
     ExpConfig config;
-    config.num_threads = 2;
+    config.num_threads = 8;
     config.batch_size = 10000;
     config.strategy = Strategy::TWO_PHASE_CENTRALIZED_MERGE;
     config.in_db_file_path = "data/tpch-sf1.db";
