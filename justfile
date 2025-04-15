@@ -29,10 +29,10 @@ run-cpp: build-cpp
     ./main --num_threads 8 --strategy SIMPLE_THREE_PHASE_RADIX
 
 tmp-run-cpp-bench: build-cpp
-    ./main --num_threads 1
-    ./main --num_threads 2
-    ./main --num_threads 4
-    ./main --num_threads 8
+    just build-cpp && ./main --num_threads 1 --strategy SIMPLE_THREE_PHASE_RADIX --in_db_file_path data/tpch-sf1.db | grep ">>"
+    just build-cpp && ./main --num_threads 2 --strategy SIMPLE_THREE_PHASE_RADIX --in_db_file_path data/tpch-sf1.db | grep ">>"
+    just build-cpp && ./main --num_threads 4 --strategy SIMPLE_THREE_PHASE_RADIX --in_db_file_path data/tpch-sf1.db | grep ">>"
+    just build-cpp && ./main --num_threads 8 --strategy SIMPLE_THREE_PHASE_RADIX --in_db_file_path data/tpch-sf1.db | grep ">>"
 
 [working-directory: 'src-go']
 @run-go:
