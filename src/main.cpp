@@ -281,7 +281,7 @@ void naive_2phase_centralised_merge_sol(ExpConfig &config, RowStore &table, int 
         if (tid == 0) { t_phase1_0 = std::chrono::steady_clock::now(); }
         
         // #pragma omp for schedule(dynamic, config.batch_size)
-        #pragma omp for schedule(static, config.batch_size)
+        #pragma omp for schedule(dynamic, config.batch_size)
         for (size_t r = 0; r < n_rows; r++) {
             auto group_key = table.get(r, 0);
             AggMapValue agg_acc;
@@ -406,7 +406,7 @@ void simple_2phase_radix_partition_sol(ExpConfig &config, RowStore &table, int t
         if (tid == 0) { t_phase1_0 = std::chrono::steady_clock::now(); }
         
         // #pragma omp for schedule(dynamic, config.batch_size)
-        #pragma omp for schedule(static, config.batch_size)
+        #pragma omp for schedule(dynamic, config.batch_size)
         for (size_t r = 0; r < n_rows; r++) {
             int64_t group_key = table.get(r, 0);
             
@@ -542,7 +542,7 @@ void simple_3phase_radix_partition_sol(ExpConfig &config, RowStore &table, int t
         if (tid == 0) { t_phase1_0 = std::chrono::steady_clock::now(); }
         
         // #pragma omp for schedule(dynamic, config.batch_size)
-        #pragma omp for schedule(static, config.batch_size)
+        #pragma omp for schedule(dynamic, config.batch_size)
         for (size_t r = 0; r < n_rows; r++) {
             int64_t group_key = table.get(r, 0);
            
@@ -658,7 +658,7 @@ void dumb_global_lock_sol(ExpConfig &config, RowStore &table, int trial_idx, std
         assert(actual_num_threads == config.num_threads);
         
         // #pragma omp for schedule(dynamic, config.batch_size)
-        #pragma omp for schedule(static, config.batch_size)
+        #pragma omp for schedule(dynamic, config.batch_size)
         for (size_t r = 0; r < n_rows; r++) {
             #pragma omp critical 
             {
