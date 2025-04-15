@@ -45,7 +45,7 @@ def bench_polars(args):
     
     # 1 > load in the data
     con = duckdb.connect(args.in_db, read_only = True)
-    df = con.sql("select * from lineitem").pl()
+    df = con.sql("select l_orderkey, l_partkey, l_suppkey from lineitem").pl()
     logger.info(f"df shape = {df.shape}")
     
     # 2 > make sql query
