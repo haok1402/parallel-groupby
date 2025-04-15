@@ -42,6 +42,8 @@ public:
     int num_threads;
     int batch_size;
     Strategy strategy;
+    int num_dryruns;
+    int num_trials;
     std::string in_db_file_path;
     std::string in_table_name;
     std::string group_key_col_name;
@@ -165,7 +167,7 @@ void load_data(ExpConfig &config, RowStore &table) {
 typedef std::array<int64_t, 2> AggMapValue; // TODO is there a way to not hard code the size?
 
 // requires table to be populated and in memory
-void sequential_sol(ExpConfig &config, RowStore &table) {
+void sequential_sol(ExpConfig &config, RowStore &table, int trial_idx) {
     assert(table.n_rows > 0);
     assert(table.n_cols > 0);
     
@@ -194,7 +196,7 @@ void sequential_sol(ExpConfig &config, RowStore &table) {
     }
 
     auto t1 = std::chrono::steady_clock::now();
-    std::cout << "Elapsed time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << " ms" << std::endl;
+    std::cout << ">>> elapsed time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << " ms" << std::endl;
 
     // spot checking
     std::cout << 419 << " -> (" << agg_map[419][0] << ", " << agg_map[419][1] << ")" << std::endl;
@@ -204,7 +206,7 @@ void sequential_sol(ExpConfig &config, RowStore &table) {
 
 typedef std::chrono::time_point<std::chrono::steady_clock> chrono_time_point;
 
-void naive_2phase_centralised_merge_sol(ExpConfig &config, RowStore &table) {
+void naive_2phase_centralised_merge_sol(ExpConfig &config, RowStore &table, int trial_idx) {
     omp_set_num_threads(config.num_threads);
     
     auto n_cols = table.n_cols;
@@ -259,7 +261,7 @@ void naive_2phase_centralised_merge_sol(ExpConfig &config, RowStore &table) {
         
         if (tid == 0) {
             t_phase1_1 = std::chrono::steady_clock::now();
-            std::cout << "Phase 1 time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_phase1_1 - t_phase1_0).count() << " ms" << std::endl;
+            std::cout << ">> Phase 1 time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_phase1_1 - t_phase1_0).count() << " ms" << std::endl;
         }
 
         // PHASE 2: thread 0 merges results
@@ -286,13 +288,13 @@ void naive_2phase_centralised_merge_sol(ExpConfig &config, RowStore &table) {
             }
             
             t_phase2_1 = std::chrono::steady_clock::now();
-            std::cout << "Phase 2 time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_phase2_1 - t_phase2_0).count() << " ms" << std::endl;
+            std::cout << ">> Phase 2 time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_phase2_1 - t_phase2_0).count() << " ms" << std::endl;
 
         }
     }
     
     t_overall_1 = std::chrono::steady_clock::now();
-    std::cout << "Elapsed time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_overall_1 - t_overall_0).count() << " ms" << std::endl;
+    std::cout << ">>> elapsed time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_overall_1 - t_overall_0).count() << " ms" << std::endl;
     // spot checking
     std::cout << 419 << " -> (" << agg_map[419][0] << ", " << agg_map[419][1] << ")" << std::endl;
     std::cout << 3488 << " -> (" << agg_map[3488][0] << ", " << agg_map[3488][1] << ")" << std::endl;
@@ -300,7 +302,7 @@ void naive_2phase_centralised_merge_sol(ExpConfig &config, RowStore &table) {
 
 }
 
-void dumb_global_lock_sol(ExpConfig &config, RowStore &table) {
+void dumb_global_lock_sol(ExpConfig &config, RowStore &table, int trial_idx) {
     omp_set_num_threads(config.num_threads);
     
     auto n_cols = table.n_cols;
@@ -341,7 +343,7 @@ void dumb_global_lock_sol(ExpConfig &config, RowStore &table) {
     }
     
     t_overall_1 = std::chrono::steady_clock::now();
-    std::cout << "Elapsed time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_overall_1 - t_overall_0).count() << " ms" << std::endl;
+    std::cout << ">>> elapsed time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_overall_1 - t_overall_0).count() << " ms" << std::endl;
     // spot checking
     std::cout << 419 << " -> (" << agg_map[419][0] << ", " << agg_map[419][1] << ")" << std::endl;
     std::cout << 3488 << " -> (" << agg_map[3488][0] << ", " << agg_map[3488][1] << ")" << std::endl;
@@ -356,6 +358,8 @@ int main(int argc, char *argv[]) {
     // set defaults
     ExpConfig config;
     config.num_threads = 1;
+    config.num_dryruns = 1;
+    config.num_trials = 3;
     config.batch_size = 10000;
     config.strategy = Strategy::SEQUENTIAL;
     config.in_db_file_path = "data/tpch-sf1.db";
@@ -394,14 +398,30 @@ int main(int argc, char *argv[]) {
     load_data(config, table);
     
     // 3 > run the experiment
-    if (config.strategy == Strategy::SEQUENTIAL) {
-        sequential_sol(config, table);
-    } else if (config.strategy == Strategy::GLOBAL_LOCK) {
-        dumb_global_lock_sol(config, table);
-    } else if (config.strategy == Strategy::TWO_PHASE_CENTRALIZED_MERGE) {
-        naive_2phase_centralised_merge_sol(config, table);
-    } else {
-        throw std::runtime_error("Unsupported strategy");
+    for (int dryrun_idx = 0; dryrun_idx < config.num_dryruns; dryrun_idx++) {
+        printf(">>> running dryrun %d\n", dryrun_idx);
+        if (config.strategy == Strategy::SEQUENTIAL) {
+            sequential_sol(config, table, dryrun_idx);
+        } else if (config.strategy == Strategy::GLOBAL_LOCK) {
+            dumb_global_lock_sol(config, table, dryrun_idx);
+        } else if (config.strategy == Strategy::TWO_PHASE_CENTRALIZED_MERGE) {
+            naive_2phase_centralised_merge_sol(config, table, dryrun_idx);
+        } else {
+            throw std::runtime_error("Unsupported strategy");
+        }
+    }
+    
+    for (int trial_idx = 0; trial_idx < config.num_trials; trial_idx++) {
+        printf(">>> running trial %d\n", trial_idx);
+        if (config.strategy == Strategy::SEQUENTIAL) {
+            sequential_sol(config, table, trial_idx);
+        } else if (config.strategy == Strategy::GLOBAL_LOCK) {
+            dumb_global_lock_sol(config, table, trial_idx);
+        } else if (config.strategy == Strategy::TWO_PHASE_CENTRALIZED_MERGE) {
+            naive_2phase_centralised_merge_sol(config, table, trial_idx);
+        } else {
+            throw std::runtime_error("Unsupported strategy");
+        }
     }
     
     return 0;
