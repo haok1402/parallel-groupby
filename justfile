@@ -25,7 +25,8 @@ build-cpp:
     make
 
 run-cpp: build-cpp
-    ./main --num_threads 1
+    # ./main --num_threads 1
+    ./main --num_threads 8 --strategy SIMPLE_THREE_PHASE_RADIX
 
 tmp-run-cpp-bench: build-cpp
     ./main --num_threads 1
