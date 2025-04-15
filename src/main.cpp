@@ -9,6 +9,7 @@
 #include <omp.h>
 #include <string>
 #include <utility>
+#include "CLI11.hpp"
 
 struct Entry {
     int64_t l_orderkey;
@@ -301,9 +302,9 @@ int main(int argc, char *argv[]) {
     
     // 1 > parse command line
     
-    // make a ExpConfig TODO parse from cli instead
+    // set defaults
     ExpConfig config;
-    config.num_threads = 8;
+    config.num_threads = 1;
     config.batch_size = 10000;
     config.strategy = Strategy::TWO_PHASE_CENTRALIZED_MERGE;
     config.in_db_file_path = "data/tpch-sf1.db";
@@ -311,6 +312,10 @@ int main(int argc, char *argv[]) {
     config.group_key_col_name = "l_orderkey";
     config.data_col_names = {"l_partkey", "l_suppkey"};
     config.agg_funcs = {AggFunc::SUM, AggFunc::SUM};
+    
+    CLI::App app{"Whatever"};
+    app.add_option("--num_threads", config.num_threads, "num threads");
+    CLI11_PARSE(app, argc, argv);
     config.display();
     
     // 2 > load the data
