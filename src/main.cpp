@@ -1,3 +1,4 @@
+#include "duckdb/common/types/data_chunk.hpp"
 #include "duckdb/common/types/value.hpp"
 #include <cassert>
 #include <chrono>
@@ -12,6 +13,12 @@ struct Entry {
     int64_t l_partkey;
     int64_t l_suppkey;
 };
+
+struct AggMapValue {
+    int64_t v1;
+    int64_t v2;
+};
+
 
 enum class AggFunc {
     SUM,
@@ -57,40 +64,61 @@ public:
 };
 
 // column major data storage
-class DataStore {
+class ColumnStore {
 public:
-    std::vector<std::vector<duckdb::Value>> data;
-    
-    duckdb::Value get(int row_idx, int col_idx) {
-        return data[col_idx][row_idx];
-    }
-    
-    duckdb::Value& get_ref(int row_idx, int col_idx) {
-        return data[col_idx][row_idx];
-    }
+    std::vector<int64_t> data; 
+    int n_cols;
+    int n_rows;
     
     void init_table(int num_cols, int num_rows) {
-        data.resize(num_cols);
-        for (auto& col : data) {
-            col.reserve(num_rows);
-        }
+        n_cols = num_cols;
+        n_rows = num_rows;
+        data.resize(num_cols * num_rows);
     }
     
-    int n_cols() const {
-        return data.size();
+    inline int get_idx(int row_idx, int col_idx) {
+        return col_idx * n_rows + row_idx;
     }
     
-    int n_rows() const {
-        if (data.empty()) {
-            return 0;
-        }
-        return data[0].size();
+    inline int64_t get(int row_idx, int col_idx) {
+        return data[get_idx(row_idx, col_idx)];
+    }
+    
+    inline void write_value(int row_idx, int col_idx, int64_t value) {
+        data[get_idx(row_idx, col_idx)] = value;
+    }
+
+};
+
+class RowStore {
+public:
+    std::vector<int64_t> data; // everything back to back in same chunk of meomry
+    int n_cols;
+    int n_rows;
+    
+    void init_table(int num_cols, int num_rows) {
+        n_cols = num_cols;
+        n_rows = num_rows;
+        data.resize(num_cols * num_rows);
+    }
+    
+    inline int get_idx(int row_idx, int col_idx) {
+        return row_idx * n_cols + col_idx;
+    }
+    
+    inline void write_value(int row_idx, int col_idx, int64_t value) {
+        data[get_idx(row_idx, col_idx)] = value;
+    }
+    
+    inline int64_t get(int row_idx, int col_idx) {
+        return data[get_idx(row_idx, col_idx)];
     }
 };
 
+
 // using config specification, load stuff into table
 // for now, assume one group column, and group key column is not any of the value columns
-void load_data(ExpConfig &config, DataStore &table) {
+void load_data(ExpConfig &config, ColumnStore &table) {
     duckdb::DuckDB db(config.in_db_file_path);
     duckdb::Connection con(db);
     
@@ -107,49 +135,58 @@ void load_data(ExpConfig &config, DataStore &table) {
     table.init_table(n_cols, duckdb_res->RowCount());
     
     // go through all chunks
+    int r = 0;
     while (auto chunk = duckdb_res->Fetch()) {
         // go through each col i in the chunk
         for (duckdb::idx_t r_in_chunk = 0; r_in_chunk < chunk->size(); r_in_chunk++) {
             for (duckdb::idx_t c = 0; c < n_cols; c++) {
-                table.data[c].push_back(chunk->GetValue(c, r_in_chunk));
+                table.write_value(r, c, chunk->GetValue(c, r_in_chunk).GetValue<int64_t>());
             }
+            r++;
         }
     }
     
-    std::cout << "table.n_rows() = " << table.n_rows() << std::endl;
-    std::cout << "table.n_cols() = " << table.n_cols() << std::endl;
+    std::cout << "table.n_rows = " << table.n_rows << std::endl;
+    std::cout << "table.n_cols = " << table.n_cols << std::endl;
 }
 
 // requires table to be populated and in memory
-void sequential_sol(ExpConfig &config, DataStore &table) {
-    assert(table.n_rows() > 0);
-    assert(table.n_cols() > 0);
+void sequential_sol(ExpConfig &config, ColumnStore &table) {
+    assert(table.n_rows > 0);
+    assert(table.n_cols > 0);
     
-    auto n_cols = table.n_cols();
-    auto n_rows = table.n_rows();
-    auto t0 = std::chrono::high_resolution_clock::now();
+    auto n_cols = table.n_cols;
+    auto n_rows = table.n_rows;
+    assert(n_cols == 3); // how to support dynamic col count?
+    
+    auto t0 = std::chrono::steady_clock::now();
 
     // groupby with just some map
-    std::unordered_map<int64_t, std::vector<int64_t>> agg_map;
+    std::unordered_map<int64_t, std::array<int64_t, 2>> agg_map;
+    // std::unordered_map<int64_t, AggMapValue> agg_map;
 
     for (size_t r = 0; r < n_rows; r++) {
-        auto group_key = table.get(r, 0).GetValue<int64_t>();
+        auto group_key = table.get(r, 0);
         
         // find existing entry, if not initialise
         std::vector<duckdb::Value> existing;
         if (auto search = agg_map.find(group_key); search != agg_map.end()) {
         } else {
-            auto existing = std::vector<int64_t>(n_cols - 1, 0); // key |-> entry of all 0s
+            // key |-> entry of all 0s
+            auto existing = std::array<int64_t, 2>{0, 0};
+            // auto existing = AggMapValue{0, 0};
             agg_map[group_key] = existing;
         }
 
         for (size_t c = 1; c < n_cols; c++) {
             if (c == 0) continue;
-            agg_map[group_key][c - 1] = agg_map[group_key][c - 1] + table.get(r, c).GetValue<int64_t>();
+            agg_map[group_key][c - 1] = agg_map[group_key][c - 1] + table.get(r, c);
         }
+        // agg_map[group_key].v1 = agg_map[group_key].v1 + table.get(r, 1);
+        // agg_map[group_key].v2 = agg_map[group_key].v2 + table.get(r, 2);
     }
 
-    auto t1 = std::chrono::high_resolution_clock::now();
+    auto t1 = std::chrono::steady_clock::now();
     std::cout << "Elapsed time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << " ms" << std::endl;
 
 }
@@ -181,7 +218,7 @@ int main(int argc, char *argv[]) {
     config.display();
     
     // 2 > load the data
-    DataStore table;
+    ColumnStore table;
     load_data(config, table);
     
     // 3 > run the experiment
