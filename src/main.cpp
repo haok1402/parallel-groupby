@@ -9,7 +9,7 @@ struct Entry {
     int64_t l_suppkey;
 };
 
-int main() {
+int sequential_sol() {
     std::string table_name = "lineitem";
     std::string db_fpath = "data/tpch-sf1.db";
     std::vector<std::string> group_key_cols = {"l_orderkey"};
@@ -62,5 +62,21 @@ int main() {
     auto t1 = std::chrono::high_resolution_clock::now();
     std::cout << "Elapsed time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << " ms" << std::endl;
 
+    return 0;
+}
+
+void hello_omp() {
+    int num_threads = 8;
+    omp_set_num_threads(num_threads);
+    #pragma omp parallel
+    {
+        int tid = omp_get_thread_num();
+        int actual_num_threads = omp_get_num_threads();
+        printf("hello from thread %d among %d threads\n", tid, actual_num_threads);
+    }
+}
+
+int main() {
+    hello_omp();
     return 0;
 }
