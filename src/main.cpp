@@ -22,8 +22,7 @@ int main() {
      * Populate the data in row-major format with limited columns.
      */
     std::vector<Entry> data;
-    auto result =
-        con.Query("SELECT l_orderkey, l_partkey, l_suppkey FROM lineitem");
+    auto result = con.Query("SELECT l_orderkey, l_partkey, l_suppkey FROM lineitem");
     data.reserve(result->RowCount());
 
     while (auto chunk = result->Fetch()) {
@@ -48,8 +47,7 @@ int main() {
          * Lookup the previous value.
          */
         Entry prev;
-        if (auto search = agg_map.find(row.l_orderkey);
-            search != agg_map.end()) {
+        if (auto search = agg_map.find(row.l_orderkey); search != agg_map.end()) {
             prev = search->second;
         }
         /**
@@ -62,10 +60,7 @@ int main() {
     }
 
     auto t1 = std::chrono::high_resolution_clock::now();
-    std::cout << "Elapsed time: "
-              << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0)
-                     .count()
-              << " ms" << std::endl;
+    std::cout << "Elapsed time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << " ms" << std::endl;
 
     return 0;
 }
