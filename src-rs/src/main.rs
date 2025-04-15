@@ -16,7 +16,7 @@ use duckdb::arrow::record_batch::RecordBatch;
 // use arrow::record_batch::RecordBatch;
 
 use duckdb::arrow::util::pretty::print_batches;
-use std::collections::HashMap;
+use fxhash::FxHashMap;
 
 #[derive(Debug)]
 struct Row {
@@ -48,18 +48,26 @@ fn main() -> Result<()> {
     
     let t_start = std::time::Instant::now();
 
-    let mut l_extendedprice_sum_map: HashMap<i64, f32> = HashMap::new();
-    let mut l_discount_sum_map: HashMap<i64, f32> = HashMap::new();
-    let mut l_discount_avg_map: HashMap<i64, f32> = HashMap::new();
-    let mut count_map: HashMap<i64, usize> = HashMap::new();
+    // let mut l_extendedprice_sum_map: FxHashMap<i64, f32> = FxHashMap::default();
+    // let mut l_discount_sum_map: FxHashMap<i64, f32> = FxHashMap::default();
+    // let mut count_map: FxHashMap<i64, usize> = FxHashMap::default();
+    // condense above into single hash map
+    let mut combined_map: FxHashMap<i64, (f32, f32, usize, f32)> = FxHashMap::default();
     for row in rows {
-        l_extendedprice_sum_map.entry(row.l_orderkey).and_modify(|x| *x += row.l_extendedprice).or_insert(row.l_extendedprice);
-        l_discount_sum_map.entry(row.l_orderkey).and_modify(|x| *x += row.l_discount).or_insert(row.l_discount);
-        count_map.entry(row.l_orderkey).and_modify(|x| *x += 1).or_insert(1);
+        // l_extendedprice_sum_map.entry(row.l_orderkey).and_modify(|x| *x += row.l_extendedprice).or_insert(row.l_extendedprice);
+        // l_discount_sum_map.entry(row.l_orderkey).and_modify(|x| *x += row.l_discount).or_insert(row.l_discount);
+        // count_map.entry(row.l_orderkey).and_modify(|x| *x += 1).or_insert(1);
+        combined_map.entry(row.l_orderkey).and_modify(|x| {
+            *x = (x.0 + row.l_extendedprice, x.1 + row.l_discount, x.2 + 1, (x.1 + row.l_discount) / ((x.2 + 1) as f32))
+        }).or_insert((row.l_extendedprice, row.l_discount, 1, row.l_discount));
     }
-    for (k, v) in l_discount_sum_map.iter() {
-        l_discount_avg_map.insert(*k, *v / (count_map.get(k).unwrap().clone() as f32));
-    }
+    // for (k, (l_extendedprice_sum, l_discount, count)) in combined_map.iter() {
+    //     l_discount_avg_map.insert(*k, *v / (count_map.get(k).unwrap().clone() as f32));
+    // }
+    // let mut l_discount_avg_map: FxHashMap<i64, f32> = FxHashMap::default();
+    // for (k, (l_extendedprice_sum, l_discount, count)) in combined_map.iter() {
+    //     l_discount_avg_map.insert(*k, l_discount / (*count as f32));
+    // }
     
     // dbg!(l_discount_avg_map);
     // dbg!(count_map);
@@ -69,5 +77,10 @@ fn main() -> Result<()> {
     let t_total = t_end - t_start;
     println!("total time {:?}", t_total);
 
+    println!("correctness spot check");
+    println!("419 -> {:?}", combined_map.get(&419));
+    println!("3488 -> {:?}", combined_map.get(&3488));
+    println!("5997667 -> {:?}", combined_map.get(&5997667));
+    
     Ok(())
 }

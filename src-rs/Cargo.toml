@@ -7,3 +7,4 @@ build = "build.rs"
 [dependencies]
 duckdb = "1.2.2"
 arrow = { version = "*", default-features = false, features = ["prettyprint"] }
+fxhash = "0.2.1"
