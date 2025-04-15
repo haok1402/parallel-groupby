@@ -10,6 +10,7 @@ import duckdb
 
 def mk_bench_qry_line_str(args, table_name: str):
     return f"SELECT l_orderkey, COUNT(*), SUM(l_extendedprice), AVG(l_discount) FROM {table_name} GROUP BY l_orderkey"
+    # return f"SELECT l_orderkey, COUNT(*), median(l_extendedprice), median(l_discount) FROM {table_name} GROUP BY l_orderkey"
 
 def main():
     # parse arguments
@@ -20,7 +21,7 @@ def main():
     parser.add_argument('-i', '--in_db', type=str, required=True) # a duckdb .db file, not parquet
     parser.add_argument('-d', '--in_dist', type=str, default="uniform")
     parser.add_argument('-nd', '--num_dryruns', type=int, default=3)
-    parser.add_argument('-nt', '--num_trials', type=int, default=10)
+    parser.add_argument('-nt', '--num_trials', type=int, default=5)
     parser.add_argument('-e', '--engine', type=str, default='polars', choices=['polars', 'duckdb'])
     parser.add_argument('-q', '--quiet', action='store_true')
     
@@ -42,7 +43,7 @@ def bench_polars(args):
     logger.info(f"pl threadpool size = {pl.thread_pool_size()}")
     
     # 1 > load in the data
-    con = duckdb.connect(args.in_db)
+    con = duckdb.connect(args.in_db, read_only = True)
     df = con.sql("select * from lineitem").pl()
     logger.info(f"df shape = {df.shape}")
     
