@@ -5,7 +5,15 @@ import statistics
 
 def main():
     trials = 5
-    for strategy in ["SEQUENTIAL", "GLOBAL_LOCK", "TWO_PHASE_CENTRALIZED_MERGE", "SIMPLE_TWO_PHASE_RADIX", "SIMPLE_THREE_PHASE_RADIX"]:
+    for strategy in [
+        "SEQUENTIAL",
+        "GLOBAL_LOCK",
+        "TWO_PHASE_CENTRALIZED_MERGE",
+        "SIMPLE_TWO_PHASE_RADIX",
+        "SIMPLE_THREE_PHASE_RADIX",
+        "IMPLICIT_REPARTITIONING",
+        "DUCKDBISH_TWO_PHASE"
+    ]:
         i, n = 1, os.cpu_count()
 
         while i <= n:
@@ -22,7 +30,7 @@ def main():
             match strategy:
                 case "SEQUENTIAL":
                     break
-                case "TWO_PHASE_CENTRALIZED_MERGE" | "SIMPLE_TWO_PHASE_RADIX" | "SIMPLE_THREE_PHASE_RADIX":
+                case "TWO_PHASE_CENTRALIZED_MERGE" | "SIMPLE_TWO_PHASE_RADIX" | "SIMPLE_THREE_PHASE_RADIX" | "DUCKDBISH_TWO_PHASE":
                     matches = re.findall(r'phase_1=(\d+)ms', outputs)
                     average = statistics.mean(map(float, matches[-trials:]))
                     print(f"{strategy},phase_1,{i},{average}")
