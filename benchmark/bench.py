@@ -1,7 +1,6 @@
 #! unified script for benchmarking different engines and approaches
 
 import os
-import polars as pl
 from loguru import logger
 import argparse
 from rich import inspect as rinspect
@@ -41,6 +40,7 @@ def main():
     
 def bench_polars(args):
     os.environ["POLARS_MAX_THREADS"] = str(args.num_threads)
+    import polars as pl
     logger.info(f"pl threadpool size = {pl.thread_pool_size()}")
     
     # 1 > load in the data
