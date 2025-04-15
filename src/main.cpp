@@ -47,6 +47,7 @@ public:
     Strategy strategy;
     int num_dryruns;
     int num_trials;
+    int cardinality_reduction;
     std::string in_db_file_path;
     std::string in_table_name;
     std::string group_key_col_name;
@@ -139,8 +140,12 @@ void load_data(ExpConfig &config, RowStore &table) {
     duckdb::Connection con(db);
     
     auto table_description = con.TableInfo(config.in_table_name);
-    // std::string sql_qry = "SELECT " + config.group_key_col_name + " % 100000";
     std::string sql_qry = "SELECT " + config.group_key_col_name;
+    
+    if (config.cardinality_reduction != -1) {
+        sql_qry += " % " + std::to_string(config.cardinality_reduction);
+    }
+    
     for (const auto& col_name : config.data_col_names) {
         sql_qry += ", " + col_name;
     }
@@ -701,6 +706,10 @@ void print_spotcheck(std::vector<AggResRow> agg_res) {
     }
 }
 
+void print_agg_stats(std::vector<AggResRow> agg_res) {
+    std::cout << ">> output has " << agg_res.size() << " rows" << std::endl;
+}
+
 int main(int argc, char *argv[]) {
     
     // 1 > parse command line
@@ -711,6 +720,7 @@ int main(int argc, char *argv[]) {
     config.radix_partition_cnt_ratio = 4; // num radix partitions = this * num_threads, higher number may mean smaller granularity for any dynamic scheduling
     config.num_dryruns = 0;
     config.num_trials = 1;
+    config.cardinality_reduction = -1; // option to reduce the number of unique group keys, or -1 to not do it
     config.batch_size = 10000;
     config.strategy = Strategy::SEQUENTIAL;
     config.in_db_file_path = "data/tpch-sf1.db";
@@ -724,6 +734,7 @@ int main(int argc, char *argv[]) {
     app.add_option("--num_threads", config.num_threads);
     app.add_option("--num_dryruns", config.num_dryruns);
     app.add_option("--num_trials", config.num_trials);
+    app.add_option("--cardinality_reduction", config.cardinality_reduction);
     app.add_option("--radix_partition_cnt_ratio", config.radix_partition_cnt_ratio);
     app.add_option("--batch_size", config.batch_size);
     std::string strat_str = "SEQUENTIAL";
@@ -774,19 +785,21 @@ int main(int argc, char *argv[]) {
     
     // 3 > run the experiment
     for (int dryrun_idx = 0; dryrun_idx < config.num_dryruns; dryrun_idx++) {
-        // printf(">>> --- running dryrun %d ---\n", dryrun_idx);
+        agg_res.clear();
+        printf(">> --- running dryrun %d ---\n", dryrun_idx);
         run_once(dryrun_idx, agg_res);
         if (dryrun_idx == 0) {
             print_spotcheck(agg_res);
         }
-        agg_res.clear();
     }
 
     for (int trial_idx = 0; trial_idx < config.num_trials; trial_idx++) {
-        // printf(">>> --- running trial %d ---\n", trial_idx);
-        run_once(trial_idx, agg_res);
+        printf(">> --- running trial %d ---\n", trial_idx);
         agg_res.clear();
+        run_once(trial_idx, agg_res);
     }
+    
+    print_agg_stats(agg_res);
     
     return 0;
 }

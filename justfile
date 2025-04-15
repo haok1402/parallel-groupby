@@ -38,15 +38,24 @@ run-cpp: build-cpp
     # ./main --num_threads 1
     ./main --num_threads 8 --strategy SIMPLE_TWO_PHASE_RADIX
 
-tmp-run-cpp-bench strat="SIMPLE_THREE_PHASE_RADIX" max_core="8": build-cpp
-    ./main --num_threads 1 --strategy {{strat}} --in_db_file_path data/tpch-sf1.db | grep ">>"
-    ./main --num_threads 2 --strategy {{strat}} --in_db_file_path data/tpch-sf1.db | grep ">>"
-    ./main --num_threads 4 --strategy {{strat}} --in_db_file_path data/tpch-sf1.db | grep ">>"
-    ./main --num_threads 8 --strategy {{strat}} --in_db_file_path data/tpch-sf1.db | grep ">>"
-    # ./main --num_threads 16 --strategy {{strat}} --in_db_file_path data/tpch-sf1.db | grep ">>"
-    # ./main --num_threads 32 --strategy {{strat}} --in_db_file_path data/tpch-sf1.db | grep ">>"
-    # ./main --num_threads 64 --strategy {{strat}} --in_db_file_path data/tpch-sf1.db | grep ">>"
-    # ./main --num_threads 128 --strategy {{strat}} --in_db_file_path data/tpch-sf1.db | grep ">>"
+tmp-run-cpp-bench strat="SIMPLE_THREE_PHASE_RADIX" max_core="8" cardinality_reduction="-1": build-cpp
+    #!/bin/bash
+    max_core={{max_core}}
+    strat={{strat}}
+    cardinality_reduction={{cardinality_reduction}}
+    echo -e "================================"
+    echo -e "strategy: $strat"
+    echo -e "max_core: $max_core"
+    echo -e "cardinality_reduction: $cardinality_reduction"
+    echo -e "================================"
+    config_args="--strategy {{strat}} --in_db_file_path data/tpch-sf10.db --cardinality_reduction $cardinality_reduction"
+    for np in 1 2 4 8 16 32 64 128; do
+        if [[ $np -gt $max_core ]]; then
+            continue
+        fi
+        echo -e "\n======== benchmarking with $np cores ========"
+        ./main --num_threads $np $config_args | grep ">>"
+    done
 
 [working-directory: 'src-go']
 @run-go:
