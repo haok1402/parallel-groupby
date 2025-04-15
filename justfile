@@ -31,3 +31,9 @@ run-cpp: build-cpp
 [working-directory: 'src-rs']
 @run-rs:
     cargo run --release
+
+setup-omp:
+    brew install libomp
+    # need to do
+    # export LDFLAGS="-L/opt/homebrew/opt/libomp/lib"
+    # export CPPFLAGS="-I/opt/homebrew/opt/libomp/include"

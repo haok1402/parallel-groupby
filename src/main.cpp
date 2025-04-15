@@ -1,6 +1,7 @@
 #include <chrono>
 #include <duckdb.hpp>
 #include <iostream>
+#include <omp.h>
 
 struct Entry {
     int64_t l_orderkey;
@@ -22,7 +23,7 @@ int main() {
     */
     std::vector<Entry> data;
     auto result =
-    con.Query("SELECT l_orderkey,l_partkey,l_suppkey FROM lineitem");
+    con.Query("SELECT l_orderkey, l_partkey, l_suppkey FROM lineitem");
     data.reserve(result->RowCount());
 
     while (auto chunk = result->Fetch()) {
