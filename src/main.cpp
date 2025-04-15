@@ -984,7 +984,7 @@ int main(int argc, char *argv[]) {
     config.batch_size = 10000;
     config.duckdb_style_adaptation_threshold = 10000;
     config.strategy = Strategy::SEQUENTIAL;
-    config.in_db_file_path = "data/tpch-sf1.db";
+    config.in_db_file_path = "data/tpch-sf10.db";
     config.in_table_name = "lineitem";
     config.group_key_col_name = "l_orderkey";
     config.data_col_names = {"l_partkey", "l_suppkey"};
