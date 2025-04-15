@@ -1,5 +1,4 @@
 #include <chrono>
-#include <fstream>
 #include <iostream>
 #include <duckdb.hpp>
 
@@ -108,30 +107,6 @@ int main()
 
     auto t1 = std::chrono::high_resolution_clock::now();
     std::cout << "Elapsed time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << " ms" << std::endl;
-
-    /**
-     * Save to disk in CSV format for a quick sanity check.
-     */
-    std::ofstream outfile("out1.csv");
-
-    if (!outfile) {
-        std::cerr << "Error opening file for writing!" << std::endl;
-        return 1;
-    }
-
-    for (const auto& [key, values] : record)
-    {
-        outfile << key.GetValue<int64_t>();
-
-        for (duckdb::idx_t i = 0; i < values.size(); i++)
-        {
-            outfile << "," << values[i].GetValue<int64_t>();
-        }
-
-        outfile << "\n";
-    }
-
-    outfile.close();
 
     return 0;
 }
