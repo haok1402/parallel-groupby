@@ -81,7 +81,7 @@ def bench_duckdb(args):
     
     # 1 > load in the data
     con = db.connect(args.in_db, config={'threads': args.num_threads})
-    con.sql("CREATE TEMP TABLE in_table AS SELECT * FROM lineitem;")
+    con.sql("CREATE TEMP TABLE in_table AS SELECT l_orderkey, l_partkey, l_suppkey FROM lineitem;")
     # con.sql("SET threads TO 4;")
     logger.info("loaded data into memory")
     
