@@ -26,13 +26,13 @@ build-cpp:
 
 run-cpp: build-cpp
     # ./main --num_threads 1
-    ./main --num_threads 8 --strategy SIMPLE_THREE_PHASE_RADIX
+    ./main --num_threads 8 --strategy SIMPLE_TWO_PHASE_RADIX
 
-tmp-run-cpp-bench: build-cpp
-    just build-cpp && ./main --num_threads 1 --strategy SIMPLE_THREE_PHASE_RADIX --in_db_file_path data/tpch-sf1.db | grep ">>"
-    just build-cpp && ./main --num_threads 2 --strategy SIMPLE_THREE_PHASE_RADIX --in_db_file_path data/tpch-sf1.db | grep ">>"
-    just build-cpp && ./main --num_threads 4 --strategy SIMPLE_THREE_PHASE_RADIX --in_db_file_path data/tpch-sf1.db | grep ">>"
-    just build-cpp && ./main --num_threads 8 --strategy SIMPLE_THREE_PHASE_RADIX --in_db_file_path data/tpch-sf1.db | grep ">>"
+tmp-run-cpp-bench strat="SIMPLE_THREE_PHASE_RADIX": build-cpp
+    ./main --num_threads 1 --strategy {{strat}} --in_db_file_path data/tpch-sf1.db | grep ">>"
+    ./main --num_threads 2 --strategy {{strat}} --in_db_file_path data/tpch-sf1.db | grep ">>"
+    ./main --num_threads 4 --strategy {{strat}} --in_db_file_path data/tpch-sf1.db | grep ">>"
+    ./main --num_threads 8 --strategy {{strat}} --in_db_file_path data/tpch-sf1.db | grep ">>"
 
 [working-directory: 'src-go']
 @run-go:
