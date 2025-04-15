@@ -21,8 +21,8 @@ use fxhash::FxHashMap;
 #[derive(Debug)]
 struct Row {
     l_orderkey: i64,
-    l_extendedprice: f32,
-    l_discount: f32,
+    l_partkey: i64,
+    l_suppkey: i64,
 }
 
 fn main() -> Result<()> {
@@ -33,12 +33,12 @@ fn main() -> Result<()> {
     
     println!("reading table into memory...");
     
-    let mut stmt = conn.prepare("select l_orderkey, l_extendedprice, l_discount from lineitem")?;
+    let mut stmt = conn.prepare("select l_orderkey, l_partkey, l_suppkey from lineitem")?;
     let rows_iter = stmt.query_map([], |row| {
         Ok(Row {
             l_orderkey: row.get(0)?,
-            l_extendedprice: row.get(1)?,
-            l_discount: row.get(2)?,
+            l_partkey: row.get(1)?,
+            l_suppkey: row.get(2)?,
         })
     })?;
 
@@ -48,25 +48,25 @@ fn main() -> Result<()> {
     
     let t_start = std::time::Instant::now();
 
-    // let mut l_extendedprice_sum_map: FxHashMap<i64, f32> = FxHashMap::default();
-    // let mut l_discount_sum_map: FxHashMap<i64, f32> = FxHashMap::default();
+    // let mut l_extendedprice_sum_map: FxHashMap<i64, i64> = FxHashMap::default();
+    // let mut l_discount_sum_map: FxHashMap<i64, i64> = FxHashMap::default();
     // let mut count_map: FxHashMap<i64, usize> = FxHashMap::default();
     // condense above into single hash map
-    let mut combined_map: FxHashMap<i64, (f32, f32, usize, f32)> = FxHashMap::default();
+    let mut combined_map: FxHashMap<i64, (i64, i64, usize, i64)> = FxHashMap::default();
     for row in rows {
         // l_extendedprice_sum_map.entry(row.l_orderkey).and_modify(|x| *x += row.l_extendedprice).or_insert(row.l_extendedprice);
         // l_discount_sum_map.entry(row.l_orderkey).and_modify(|x| *x += row.l_discount).or_insert(row.l_discount);
         // count_map.entry(row.l_orderkey).and_modify(|x| *x += 1).or_insert(1);
         combined_map.entry(row.l_orderkey).and_modify(|x| {
-            *x = (x.0 + row.l_extendedprice, x.1 + row.l_discount, x.2 + 1, (x.1 + row.l_discount) / ((x.2 + 1) as f32))
-        }).or_insert((row.l_extendedprice, row.l_discount, 1, row.l_discount));
+            *x = (x.0 + row.l_partkey, x.1 + row.l_suppkey, x.2 + 1, (x.1 + row.l_suppkey) / ((x.2 + 1) as i64))
+        }).or_insert((row.l_partkey, row.l_suppkey, 1, row.l_suppkey));
     }
     // for (k, (l_extendedprice_sum, l_discount, count)) in combined_map.iter() {
-    //     l_discount_avg_map.insert(*k, *v / (count_map.get(k).unwrap().clone() as f32));
+    //     l_discount_avg_map.insert(*k, *v / (count_map.get(k).unwrap().clone() as i64));
     // }
-    // let mut l_discount_avg_map: FxHashMap<i64, f32> = FxHashMap::default();
+    // let mut l_discount_avg_map: FxHashMap<i64, i64> = FxHashMap::default();
     // for (k, (l_extendedprice_sum, l_discount, count)) in combined_map.iter() {
-    //     l_discount_avg_map.insert(*k, l_discount / (*count as f32));
+    //     l_discount_avg_map.insert(*k, l_discount / (*count as i64));
     // }
     
     // dbg!(l_discount_avg_map);
