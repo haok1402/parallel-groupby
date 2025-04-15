@@ -9,8 +9,9 @@ import time
 import duckdb
 
 def mk_bench_qry_line_str(args, table_name: str):
-    return f"SELECT l_orderkey, COUNT(*), SUM(l_extendedprice), AVG(l_discount) FROM {table_name} GROUP BY l_orderkey"
+    # return f"SELECT l_orderkey, COUNT(*), SUM(l_extendedprice), AVG(l_discount) FROM {table_name} GROUP BY l_orderkey"
     # return f"SELECT l_orderkey, COUNT(*), median(l_extendedprice), median(l_discount) FROM {table_name} GROUP BY l_orderkey"
+    return f"SELECT l_orderkey, SUM(l_partkey), SUM(l_suppkey) FROM {table_name} GROUP BY l_orderkey"
 
 def main():
     # parse arguments
