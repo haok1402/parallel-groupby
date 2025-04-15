@@ -198,9 +198,11 @@ void sequential_sol(ExpConfig &config, RowStore &table, int trial_idx) {
     std::cout << ">>> elapsed time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << " ms" << std::endl;
 
     // spot checking
-    std::cout << 419 << " -> (" << agg_map[419][0] << ", " << agg_map[419][1] << ")" << std::endl;
-    std::cout << 3488 << " -> (" << agg_map[3488][0] << ", " << agg_map[3488][1] << ")" << std::endl;
-    std::cout << 5997667 << " -> (" << agg_map[5997667][0] << ", " << agg_map[5997667][1] << ")" << std::endl;
+    std::cout << "### "
+        << 419      << " -> (" << agg_map[419][0]      << ", " << agg_map[419][1]      << ") "
+        << 3488     << " -> (" << agg_map[3488][0]     << ", " << agg_map[3488][1]     << ") "
+        << 5997667  << " -> (" << agg_map[5997667][0]  << ", " << agg_map[5997667][1]  << ")"
+        << std::endl;
 }
 
 typedef std::chrono::time_point<std::chrono::steady_clock> chrono_time_point;
