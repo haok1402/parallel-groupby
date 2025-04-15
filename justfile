@@ -48,7 +48,7 @@ tmp-run-cpp-bench strat="SIMPLE_THREE_PHASE_RADIX" max_core="8" cardinality_redu
     echo -e "max_core: $max_core"
     echo -e "cardinality_reduction: $cardinality_reduction"
     echo -e "================================"
-    config_args="--strategy {{strat}} --in_db_file_path data/tpch-sf10.db --cardinality_reduction $cardinality_reduction"
+    config_args="--strategy {{strat}} --in_db_file_path data/tpch-sf1.db --cardinality_reduction $cardinality_reduction --num_dryruns 1 --num_trials 3"
     for np in 1 2 4 8 16 32 64 128; do
         if [[ $np -gt $max_core ]]; then
             continue
