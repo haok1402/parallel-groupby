@@ -9,3 +9,6 @@ report/
 /report
 .vscode/sftp.json
 .vscode/settings.json
+src-rs/target
+CMakeFiles
+CMakeCache.txt
