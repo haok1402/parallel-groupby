@@ -8,6 +8,7 @@
 #include <string>
 #include <utility>
 #include "CLI11.hpp"
+#include "duckdb/main/settings.hpp"
 typedef std::chrono::time_point<std::chrono::steady_clock> chrono_time_point;
 
 struct Entry {
@@ -169,6 +170,10 @@ void load_data(ExpConfig &config, RowStore &table) {
 typedef std::array<int64_t, 2> AggMapValue; // TODO is there a way to not hard code the size?
 typedef std::array<int64_t, 2+1> AggResRow;   // TODO is there a way to not hard code the size?
 
+void time_print(std::string title, int run_id, chrono_time_point start, chrono_time_point end) {
+    std::cout << ">>> run=" << run_id << ", " << title << "=" << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms" << std::endl;
+}
+
 // requires table to be populated and in memory
 void sequential_sol(ExpConfig &config, RowStore &table, int trial_idx, std::vector<AggResRow> &agg_res) {
     assert(table.n_rows > 0);
@@ -209,7 +214,7 @@ void sequential_sol(ExpConfig &config, RowStore &table, int trial_idx, std::vect
     }
     
     t_agg_1 = std::chrono::steady_clock::now();
-    std::cout << ">>> aggregation time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_agg_1 - t_agg_0).count() << " ms" << std::endl;
+    time_print("aggregation_time", trial_idx, t_agg_0, t_agg_1);
 
     {
         t_output_0 = std::chrono::steady_clock::now();
@@ -220,11 +225,11 @@ void sequential_sol(ExpConfig &config, RowStore &table, int trial_idx, std::vect
         }
         
         t_output_1 = std::chrono::steady_clock::now();
-        std::cout << ">> write output: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_output_1 - t_output_0).count() << " ms" << std::endl;
+        time_print("write_output", trial_idx, t_output_0, t_output_1);
     }
 
     t_overall_1 = std::chrono::steady_clock::now();
-    std::cout << ">>> elapsed time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_overall_1 - t_overall_0).count() << " ms" << std::endl;
+    time_print("elapsed_time", trial_idx, t_overall_0, t_overall_1);
 
     // spot checking
     std::cout << 419 << " -> (" << agg_map[419][0] << ", " << agg_map[419][1] << ")" << std::endl;
@@ -292,7 +297,7 @@ void naive_2phase_centralised_merge_sol(ExpConfig &config, RowStore &table, int 
         
         if (tid == 0) {
             t_phase1_1 = std::chrono::steady_clock::now();
-            std::cout << ">> phase 1 time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_phase1_1 - t_phase1_0).count() << " ms" << std::endl;
+            time_print("phase_1", trial_idx, t_phase1_0, t_phase1_1);
         }
 
         // PHASE 2: thread 0 merges results
@@ -319,13 +324,13 @@ void naive_2phase_centralised_merge_sol(ExpConfig &config, RowStore &table, int 
             }
             
             t_phase2_1 = std::chrono::steady_clock::now();
-            std::cout << ">> phase 2 time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_phase2_1 - t_phase2_0).count() << " ms" << std::endl;
+            time_print("phase_2", trial_idx, t_phase2_0, t_phase2_1);
 
         }
     }
     
     t_agg_1 = std::chrono::steady_clock::now();
-    std::cout << ">>> aggregation time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_agg_1 - t_agg_0).count() << " ms" << std::endl;
+    time_print("aggregation_time", trial_idx, t_agg_0, t_agg_1);
     
     {
         t_output_0 = std::chrono::steady_clock::now();
@@ -336,11 +341,11 @@ void naive_2phase_centralised_merge_sol(ExpConfig &config, RowStore &table, int 
         }
         
         t_output_1 = std::chrono::steady_clock::now();
-        std::cout << ">> write output: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_output_1 - t_output_0).count() << " ms" << std::endl;
+        time_print("write_output", trial_idx, t_output_0, t_output_1);
     }
     
     t_overall_1 = std::chrono::steady_clock::now();
-    std::cout << ">>> elapsed time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_overall_1 - t_overall_0).count() << " ms" << std::endl;
+    time_print("elapsed_time", trial_idx, t_overall_0, t_overall_1);
 
 }
 
@@ -423,7 +428,7 @@ void simple_2phase_radix_partition_sol(ExpConfig &config, RowStore &table, int t
         
         if (tid == 0) {
             t_phase1_1 = std::chrono::steady_clock::now();
-            std::cout << ">> phase 1 time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_phase1_1 - t_phase1_0).count() << " ms" << std::endl;
+            time_print("phase_1", trial_idx, t_phase1_0, t_phase1_1);
         }
 
         // === PHASE 2: merge within partition, in parallel === 
@@ -454,13 +459,13 @@ void simple_2phase_radix_partition_sol(ExpConfig &config, RowStore &table, int t
         
         if (tid == 0) {
             t_phase2_1 = std::chrono::steady_clock::now();
-            std::cout << ">> phase 2 time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_phase2_1 - t_phase2_0).count() << " ms" << std::endl;
+            time_print("phase_2", trial_idx, t_phase2_0, t_phase2_1);
         }
 
     }
     
     t_agg_1 = std::chrono::steady_clock::now();
-    std::cout << ">>> aggregation time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_agg_1 - t_agg_0).count() << " ms" << std::endl;
+    time_print("aggregation_time", trial_idx, t_agg_0, t_agg_1);
     
     // === one thread write out the result === 
     {
@@ -476,11 +481,11 @@ void simple_2phase_radix_partition_sol(ExpConfig &config, RowStore &table, int t
         }
         
         t_output_1 = std::chrono::steady_clock::now();
-        std::cout << ">> write output: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_output_1 - t_output_0).count() << " ms" << std::endl;
+        time_print("write_output", trial_idx, t_output_0, t_output_1);
     }
     
     t_overall_1 = std::chrono::steady_clock::now();
-    std::cout << ">>> elapsed time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_overall_1 - t_overall_0).count() << " ms" << std::endl;
+    time_print("elapsed_time", trial_idx, t_overall_0, t_overall_1);
 }
 
 // approach: go directly into radix partition when scanning
@@ -550,7 +555,7 @@ void simple_3phase_radix_partition_sol(ExpConfig &config, RowStore &table, int t
         }
         if (tid == 0) {
             t_phase1_1 = std::chrono::steady_clock::now();
-            std::cout << ">> phase 1 time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_phase1_1 - t_phase1_0).count() << " ms" << std::endl;
+            time_print("phase_1", trial_idx, t_phase1_0, t_phase1_1);
         }
         #pragma omp barrier
         
@@ -564,7 +569,7 @@ void simple_3phase_radix_partition_sol(ExpConfig &config, RowStore &table, int t
         #pragma omp barrier
         if (tid == 0) {
             t_phase2_1 = std::chrono::steady_clock::now();
-            std::cout << ">> phase 2 time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_phase2_1 - t_phase2_0).count() << " ms" << std::endl;
+            time_print("phase_2", trial_idx, t_phase2_0, t_phase2_1);
         }
 
 
@@ -594,13 +599,13 @@ void simple_3phase_radix_partition_sol(ExpConfig &config, RowStore &table, int t
         
         if (tid == 0) {
             t_phase3_1 = std::chrono::steady_clock::now();
-            std::cout << ">> phase 3 time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_phase3_1 - t_phase3_0).count() << " ms" << std::endl;
+            time_print("phase_3", trial_idx, t_phase3_0, t_phase3_1);
         }
 
     }
     
     t_agg_1 = std::chrono::steady_clock::now();
-    std::cout << ">>> aggregation time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_agg_1 - t_agg_0).count() << " ms" << std::endl;
+    time_print("aggregation_time", trial_idx, t_agg_0, t_agg_1);
     
     // === one thread write out the result === 
     {
@@ -616,11 +621,11 @@ void simple_3phase_radix_partition_sol(ExpConfig &config, RowStore &table, int t
         }
         
         t_output_1 = std::chrono::steady_clock::now();
-        std::cout << ">> write output: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_output_1 - t_output_0).count() << " ms" << std::endl;
+        time_print("write_output", trial_idx, t_output_0, t_output_1);
     }
     
     t_overall_1 = std::chrono::steady_clock::now();
-    std::cout << ">>> elapsed time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_overall_1 - t_overall_0).count() << " ms" << std::endl;
+    time_print("elapsed_time", trial_idx, t_overall_0, t_overall_1);
 }
 
 void dumb_global_lock_sol(ExpConfig &config, RowStore &table, int trial_idx, std::vector<AggResRow> &agg_res) {
@@ -669,7 +674,7 @@ void dumb_global_lock_sol(ExpConfig &config, RowStore &table, int trial_idx, std
     }
     
     t_agg_1 = std::chrono::steady_clock::now();
-    std::cout << ">>> aggregation time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_agg_1 - t_agg_0).count() << " ms" << std::endl;
+    time_print("aggregation_time", trial_idx, t_agg_0, t_agg_1);
 
     {
         t_output_0 = std::chrono::steady_clock::now();
@@ -680,12 +685,12 @@ void dumb_global_lock_sol(ExpConfig &config, RowStore &table, int trial_idx, std
         }
         
         t_output_1 = std::chrono::steady_clock::now();
-        std::cout << ">> write output: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_output_1 - t_output_0).count() << " ms" << std::endl;
+        time_print("write_output", trial_idx, t_output_0, t_output_1);
     }
     
     t_overall_1 = std::chrono::steady_clock::now();
     
-    std::cout << ">>> elapsed time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_overall_1 - t_overall_0).count() << " ms" << std::endl;
+    time_print("elapsed_time", trial_idx, t_overall_0, t_overall_1);
 }
 
 void print_spotcheck(std::vector<AggResRow> agg_res) {
@@ -769,7 +774,7 @@ int main(int argc, char *argv[]) {
     
     // 3 > run the experiment
     for (int dryrun_idx = 0; dryrun_idx < config.num_dryruns; dryrun_idx++) {
-        printf(">>> running dryrun %d\n", dryrun_idx);
+        // printf(">>> --- running dryrun %d ---\n", dryrun_idx);
         run_once(dryrun_idx, agg_res);
         if (dryrun_idx == 0) {
             print_spotcheck(agg_res);
@@ -778,7 +783,7 @@ int main(int argc, char *argv[]) {
     }
 
     for (int trial_idx = 0; trial_idx < config.num_trials; trial_idx++) {
-        printf(">>> running trial %d\n", trial_idx);
+        // printf(">>> --- running trial %d ---\n", trial_idx);
         run_once(trial_idx, agg_res);
         agg_res.clear();
     }
