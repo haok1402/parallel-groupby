@@ -11,34 +11,14 @@
 #include <fstream>
 #include <CLI11.hpp>
 
-enum class Distribution
-{
-    Uniform,
-};
-
-std::ostream& operator<<(std::ostream& os, const Distribution& distribution)
-{
-    switch (distribution)
-    {
-        case Distribution::Uniform: return os << "uniform";
-    }
-    return os;
-}
-
 int main(int argc, char **argv)
 {
     CLI::App app{
         "Generate synthetic dataset with configurable distributions"
         "for benchmarking the performance of group-by query execution."};
 
-    Distribution distribution = Distribution::Uniform;
-    std::map<std::string, Distribution> distribution_map
-    {
-        {"uniform", Distribution::Uniform},
-    };
-
+    std::string distribution = "uniform";
     app.add_option("-d,--distribution", distribution, "Distribution: uniform, normal, or exponential")
-        ->transform(CLI::CheckedTransformer(distribution_map, CLI::ignore_case))
         ->default_val("uniform");
 
     size_t num_rows = 1 * 1000 * 1000;
