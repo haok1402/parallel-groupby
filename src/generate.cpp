@@ -1,7 +1,7 @@
 /**
  * @file generate.cpp
  * @brief Generate synthetic dataset for group-by query execution.
- * @author Hao Kang, Leon Lu
+ * @author Hao Kang <haok@andrew.cmu.edu>, Leon Lu <lianglu@andrew.cmu.edu>
  * @date April 19, 2025
  */
 
