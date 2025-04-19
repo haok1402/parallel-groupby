@@ -15,7 +15,8 @@
 #include <zlib.h>
 #include <CLI11.hpp>
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
     // Parse command line arguments
     CLI::App app{
         "Generate synthetic dataset with configurable distributions "
@@ -36,7 +37,8 @@ int main(int argc, char **argv) {
 
     CLI11_PARSE(app, argc, argv);
 
-    if (num_groups > num_rows) {
+    if (num_groups > num_rows)
+    {
         std::cerr << "Error: --num-groups cannot be greater than --num-rows!" << std::endl;
         return 1;
     }
@@ -54,7 +56,8 @@ int main(int argc, char **argv) {
 
     // Prepare for the insertion
     gzFile gz_file = gzopen(path.c_str(), "wb");
-    if (!gz_file) {
+    if (!gz_file)
+    {
         std::cerr << "Error: Failed to open " << path << " for gzip writing.\n";
         return 1;
     }
@@ -67,30 +70,46 @@ int main(int argc, char **argv) {
     gzprintf(gz_file, "key,val\n");
 
     // Ensure each group has at least one row
-    for (size_t i = 0; i < num_groups; ++i) {
+    for (size_t i = 0; i < num_groups; ++i)
+    {
         gzprintf(gz_file, "%zu,%d\n", i, val_distribution(gen));
     }
 
     // Remaining rows follow specified distribution
-    if (distribution == "uniform") {
+    if (distribution == "uniform")
+    {
         std::uniform_int_distribution<size_t> key_distribution(0, num_groups - 1);
-        for (size_t i = 0; i < num_rows - num_groups; ++i) {
+        for (size_t i = 0; i < num_rows - num_groups; ++i)
+        {
             gzprintf(gz_file, "%zu,%d\n", key_distribution(gen), val_distribution(gen));
         }
-    } else if (distribution == "normal") {
-        double mean = (num_groups - 1) / 2.0;
-        double stddev = num_groups / 6.0;
-        std::normal_distribution<> key_distribution(mean, stddev);
-
-        for (size_t i = 0; i < num_rows - num_groups; ++i) {
-            int key = std::clamp(static_cast<int>(std::round(key_distribution(gen))), 0, static_cast<int>(num_groups - 1));
-            gzprintf(gz_file, "%d,%d\n", key, val_distribution(gen));
+    }
+    else if (distribution == "normal")
+    {
+        std::normal_distribution<> key_distribution((num_groups - 1) / 2.0, num_groups / 6.0);
+        for (size_t i = 0; i < num_rows - num_groups; ++i)
+        {
+            gzprintf
+            (
+                gz_file, 
+                "%zu,%d\n",
+                static_cast<size_t>(std::clamp(std::llround(key_distribution(gen)), 0LL, static_cast<long long>(num_groups - 1))), 
+                val_distribution(gen)
+            );
         }
-    } else if (distribution == "exponential") {
+    }
+    else if (distribution == "exponential")
+    {
         std::exponential_distribution<> key_distribution(1.0 / (num_groups / 3.0));
-        for (size_t i = 0; i < num_rows - num_groups; ++i) {
-            int key = std::min(static_cast<int>(key_distribution(gen)), static_cast<int>(num_groups - 1));
-            gzprintf(gz_file, "%d,%d\n", key, val_distribution(gen));
+        for (size_t i = 0; i < num_rows - num_groups; ++i)
+        {
+            gzprintf
+            (
+                gz_file,
+                "%zu,%d\n",
+                std::min(static_cast<size_t>(key_distribution(gen)), num_groups - 1),
+                val_distribution(gen)
+            );
         }
     }
 
