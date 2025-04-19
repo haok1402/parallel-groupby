@@ -70,9 +70,25 @@ int main(int argc, char **argv)
     std::mt19937 gen(rd());
 
     // Run the insertion.
+    auto prep = con.Prepare("INSERT INTO main VALUES (?, ?)");
+    if (prep->HasError())
+    {
+        std::cerr << prep->GetError() << std::endl;
+        return 1;
+    }
+    
     if (distribution == "uniform")
     {
         std::uniform_int_distribution<int64_t> key_distribution(0, num_groups);
         std::uniform_int_distribution<int16_t> val_distribution(0, std::numeric_limits<int16_t>::max());
+        for (size_t i = 0; i < num_groups; i++)
+        {
+            auto result = prep->Execute(i, val_distribution(gen));
+            if (result->HasError())
+            {
+                std::cerr << result->GetError() << std::endl;
+                return 1;
+            }
+        }
     }
 }
