@@ -16,6 +16,8 @@ add_executable(
     generate src/generate.cpp
 )
 
+find_package(ZLIB REQUIRED)
 target_link_libraries(generate
     ${CMAKE_SOURCE_DIR}/lib/duckdb/lib/libduckdb.so
+    ZLIB::ZLIB
 )
