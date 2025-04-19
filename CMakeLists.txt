@@ -15,3 +15,7 @@ include_directories(SYSTEM
 add_executable(
     generate src/generate.cpp
 )
+
+target_link_libraries(generate
+    ${CMAKE_SOURCE_DIR}/lib/duckdb/lib/libduckdb.so
+)
