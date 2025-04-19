@@ -12,7 +12,6 @@
 #include <filesystem>
 
 #include <CLI11.hpp>
-#include <duckdb.hpp>
 
 int main(int argc, char **argv)
 {
@@ -22,7 +21,7 @@ int main(int argc, char **argv)
         "for benchmarking the performance of group-by query execution."};
 
     std::string distribution = "uniform";
-    app.add_option("-d,--distribution", distribution, "Distribution: uniform, normal, or exponential")
+    app.add_option("--distribution", distribution, "Distribution: uniform, normal, or exponential")
         ->check(CLI::IsMember({"uniform","normal", "exponential"}))
         ->default_val("uniform");
 
@@ -43,52 +42,65 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    // Determine where to store the CSV file for import by DuckDB.
+    std::ostringstream oss;
+    std::filesystem::create_directory("data/");
+    oss << "data/" << distribution << "-" << num_rows << "-" << num_groups << ".csv";
+    std::string path = oss.str();
+
+    // Display the arguments for logging purposes.
     std::cout << std::left;
     std::cout << std::setw(30) << "Distribution type"         << ": " << distribution << std::endl;
     std::cout << std::setw(30) << "Total rows to generate"    << ": " << num_rows     << std::endl;
     std::cout << std::setw(30) << "Number of distinct groups" << ": " << num_groups   << std::endl;
+    std::cout << std::setw(30) << "Output file path"          << ": " << path   << std::endl;
 
-    // Specify where to store the dataset.
-    std::ostringstream oss;
-    std::filesystem::create_directory("data/");
-    oss << "data/" << distribution << "-" << num_rows << "-" << num_groups << ".db";
-
-    // Connect to DuckDB.
-    duckdb::DuckDB db(oss.str());
-    duckdb::Connection con(db);
-
-    // Create the table.
-    auto result = con.Query("CREATE TABLE main (key BIGINT, val SMALLINT)");
-    if (result->HasError())
-    {
-        std::cerr << result->GetError() << std::endl;
+    // Open the CSV file.
+    std::ofstream file(path);
+    if (!file.is_open()) {
+        std::cerr << "Failed to write to" << path << std::endl;
         return 1;
     }
-
-    // Seed the random number generator.
-    std::random_device rd;
-    std::mt19937 gen(rd());
 
     // Run the insertion.
-    auto prep = con.Prepare("INSERT INTO main VALUES (?, ?)");
-    if (prep->HasError())
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<int16_t> val_distribution(0, std::numeric_limits<int16_t>::max());
+
+    // Ensure that each group key has a value.
+    file << "key,val" << std::endl;
+    for (size_t i = 0; i < num_groups; i++)
     {
-        std::cerr << prep->GetError() << std::endl;
-        return 1;
+        file << i << "," << val_distribution(gen) << std::endl;
     }
-    
+
+    // All other rows receive a random group key according to the distribution.
     if (distribution == "uniform")
     {
-        std::uniform_int_distribution<int64_t> key_distribution(0, num_groups);
-        std::uniform_int_distribution<int16_t> val_distribution(0, std::numeric_limits<int16_t>::max());
-        for (size_t i = 0; i < num_groups; i++)
+        std::uniform_int_distribution<int64_t> key_distribution(0, num_groups - 1);
+        for (size_t i = 0; i < num_rows - num_groups; i++)
         {
-            auto result = prep->Execute(i, val_distribution(gen));
-            if (result->HasError())
-            {
-                std::cerr << result->GetError() << std::endl;
-                return 1;
-            }
+            file
+            << key_distribution(gen)
+            << ","
+            << val_distribution(gen)
+            << std::endl;
         }
     }
+    else if (distribution == "normal")
+    {
+        double mean = (num_groups - 1) / 2.0;
+        double stddev = num_groups / 6.0;
+        std::normal_distribution<> key_distribution(mean, stddev);
+        for (size_t i = 0; i < num_rows - num_groups; i++) {
+            file
+            << std::clamp(static_cast<int>(std::round(key_distribution(gen))), 0, static_cast<int>(num_groups - 1))
+            << ","
+            << val_distribution(gen)
+            << std::endl;
+        }
+    }
+
+    file.close();
+    return 0;
 }
