@@ -10,6 +10,7 @@ add_compile_options(-O3 -march=native -Wall -Wextra -Wpedantic)
 include_directories(SYSTEM
     ${CMAKE_SOURCE_DIR}/lib/CLI11/include
     ${CMAKE_SOURCE_DIR}/lib/duckdb/include
+    ${CMAKE_SOURCE_DIR}/lib/indicators/include
 )
 
 add_executable(
@@ -17,6 +18,7 @@ add_executable(
 )
 
 find_package(ZLIB REQUIRED)
+
 target_link_libraries(generate
     ${CMAKE_SOURCE_DIR}/lib/duckdb/lib/libduckdb.so
     ZLIB::ZLIB

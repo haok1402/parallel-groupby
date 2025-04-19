@@ -13,6 +13,9 @@ mv libduckdb.so libduckdb_static.a lib/duckdb/lib/
 mkdir -p lib/CLI11/include/
 wget -O lib/CLI11/include/CLI11.hpp https://github.com/CLIUtils/CLI11/releases/download/v2.5.0/CLI11.hpp
 
+mkdir -p lib/indicators/include
+wget -O lib/indicators/include/indicators.hpp https://raw.githubusercontent.com/p-ranav/indicators/refs/heads/master/single_include/indicators/indicators.hpp
+
 python3 -m venv venv
 venv/bin/pip install -r requirements.txt
 

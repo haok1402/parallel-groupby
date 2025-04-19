@@ -14,6 +14,7 @@
 
 #include <zlib.h>
 #include <CLI11.hpp>
+#include <indicators.hpp>
 
 int main(int argc, char **argv)
 {
@@ -62,9 +63,25 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    // Seed the random number generator.
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_int_distribution<int16_t> val_distribution(0, std::numeric_limits<int16_t>::max());
+
+    // Initialize the progress bar.
+    indicators::ProgressBar bar
+    {
+        indicators::option::BarWidth{50},
+        indicators::option::Start{"["},
+        indicators::option::Fill{"="},
+        indicators::option::Lead{">"},
+        indicators::option::Remainder{" "},
+        indicators::option::End{"]"},
+        indicators::option::MaxProgress{num_rows},
+        indicators::option::ShowElapsedTime{true},
+        indicators::option::ShowRemainingTime{true},
+        indicators::option::PrefixText{"Generating Dataset"},
+    };
 
     // Write CSV header
     gzprintf(gz_file, "key,val\n");
@@ -73,6 +90,7 @@ int main(int argc, char **argv)
     for (size_t i = 0; i < num_groups; ++i)
     {
         gzprintf(gz_file, "%zu,%d\n", i, val_distribution(gen));
+        bar.tick();
     }
 
     // Remaining rows follow specified distribution
@@ -81,12 +99,19 @@ int main(int argc, char **argv)
         std::uniform_int_distribution<size_t> key_distribution(0, num_groups - 1);
         for (size_t i = 0; i < num_rows - num_groups; ++i)
         {
-            gzprintf(gz_file, "%zu,%d\n", key_distribution(gen), val_distribution(gen));
+            gzprintf
+            (
+                gz_file,
+                "%zu,%d\n",
+                key_distribution(gen),
+                val_distribution(gen)
+            );
+            bar.tick();
         }
     }
     else if (distribution == "normal")
     {
-        std::normal_distribution<> key_distribution((num_groups - 1) / 2.0, num_groups / 6.0);
+        std::normal_distribution<> key_distribution(num_groups / 2.0, num_groups / 5.0);
         for (size_t i = 0; i < num_rows - num_groups; ++i)
         {
             gzprintf
@@ -96,11 +121,12 @@ int main(int argc, char **argv)
                 static_cast<size_t>(std::clamp(std::llround(key_distribution(gen)), 0LL, static_cast<long long>(num_groups - 1))), 
                 val_distribution(gen)
             );
+            bar.tick();
         }
     }
     else if (distribution == "exponential")
     {
-        std::exponential_distribution<> key_distribution(1.0 / (num_groups / 3.0));
+        std::exponential_distribution<> key_distribution(num_groups / 5.0);
         for (size_t i = 0; i < num_rows - num_groups; ++i)
         {
             gzprintf
@@ -110,6 +136,7 @@ int main(int argc, char **argv)
                 std::min(static_cast<size_t>(key_distribution(gen)), num_groups - 1),
                 val_distribution(gen)
             );
+            bar.tick();
         }
     }
 
