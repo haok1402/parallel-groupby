@@ -5,8 +5,13 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 add_definitions(-D_GLIBCXX_USE_CXX11_ABI=0)
+add_compile_options(-O3 -march=native -Wall -Wextra -Wpedantic)
 
-add_executable(generate src/generate.cpp)
+include_directories(
+    ${CMAKE_SOURCE_DIR}/lib/CLI11/include
+    ${CMAKE_SOURCE_DIR}/lib/duckdb/include
+)
 
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 ${OpenMP_CXX_FLAGS}")
+add_executable(
+    generate src/generate.cpp
+)
