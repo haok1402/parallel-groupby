@@ -1,18 +1,9 @@
-lib/
-venv/
-build/
-.vscode/
+/lib
+/build
 
-data/
-report/
-/data/*.db
-/report
-.vscode/sftp.json
-.vscode/settings.json
-src-rs/target
-CMakeFiles
-CMakeCache.txt
-main
-cmake_install.cmake
-Makefile
-out1.csv
+/venv
+/data
+/figures
+
+/.vscode/sftp.json
+/.vscode/settings.json
