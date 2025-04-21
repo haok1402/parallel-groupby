@@ -16,6 +16,23 @@
 #include <CLI11.hpp>
 #include <indicators.hpp>
 
+size_t parse_count(const std::string &s)
+{
+    double num;
+    char suffix = '\0';
+    std::stringstream ss(s);
+    ss >> num >> suffix;
+
+    switch (toupper(suffix))
+    {
+        case 'K': return static_cast<size_t>(num * 1e3);
+        case 'M': return static_cast<size_t>(num * 1e6);
+        case 'B': return static_cast<size_t>(num * 1e9);
+        case 'T': return static_cast<size_t>(num * 1e12);
+        default : return static_cast<size_t>(num);
+    }
+}
+
 int main(int argc, char **argv)
 {
     // Parse command line arguments
@@ -28,15 +45,18 @@ int main(int argc, char **argv)
         ->check(CLI::IsMember({"uniform", "normal", "exponential"}))
         ->default_val("uniform");
 
-    size_t num_rows = 1'000'000;
-    app.add_option("--num-rows", num_rows, "Number of rows in the table")
-        ->default_val("1000000");
+    std::string num_rows_str = "1M";
+    app.add_option("--num-rows", num_rows_str, "Number of rows in the table")
+        ->default_val("1M");
 
-    size_t num_groups = 1'000;
-    app.add_option("--num-groups", num_groups, "Number of groups in the distribution")
-        ->default_val("1000");
+    std::string num_groups_str = "1K";
+    app.add_option("--num-groups", num_groups_str, "Number of groups in the distribution")
+        ->default_val("1K");
 
     CLI11_PARSE(app, argc, argv);
+
+    size_t num_rows = parse_count(num_rows_str);
+    size_t num_groups = parse_count(num_groups_str);
 
     if (num_groups > num_rows)
     {
@@ -46,14 +66,14 @@ int main(int argc, char **argv)
 
     std::filesystem::create_directory("data");
     std::ostringstream oss;
-    oss << "data/" << distribution << "-" << num_rows << "-" << num_groups << ".csv.gz";
+    oss << "data/" << distribution << "-" << num_rows_str << "-" << num_groups_str << ".csv.gz";
     std::string path = oss.str();
 
     std::cout << std::left;
-    std::cout << std::setw(30) << "Distribution type"         << ": " << distribution << "\n";
-    std::cout << std::setw(30) << "Total rows to generate"    << ": " << num_rows     << "\n";
-    std::cout << std::setw(30) << "Number of distinct groups" << ": " << num_groups   << "\n";
-    std::cout << std::setw(30) << "Output file path"          << ": " << path         << "\n";
+    std::cout << std::setw(30) << "Distribution type"         << ": " << distribution     << "\n";
+    std::cout << std::setw(30) << "Total rows to generate"    << ": " << num_rows_str     << "\n";
+    std::cout << std::setw(30) << "Number of distinct groups" << ": " << num_groups_str   << "\n";
+    std::cout << std::setw(30) << "Output file path"          << ": " << path             << "\n";
 
     // Prepare for the insertion
     gzFile gz_file = gzopen(path.c_str(), "wb");
