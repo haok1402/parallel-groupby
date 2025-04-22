@@ -7,19 +7,21 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 add_definitions(-D_GLIBCXX_USE_CXX11_ABI=0)
 add_compile_options(-O3 -march=native -Wall -Wextra -Wpedantic)
 
-include_directories(SYSTEM
+include_directories(SYSTEM 
     ${CMAKE_SOURCE_DIR}/lib/CLI11/include
-    ${CMAKE_SOURCE_DIR}/lib/duckdb/include
     ${CMAKE_SOURCE_DIR}/lib/indicators/include
+    ${CMAKE_SOURCE_DIR}/lib/duckdb/include
 )
 
-add_executable(
-    generate src/generate.cpp
-)
+add_executable(generate src/generate.cpp)
+add_executable(two-phase-central-merge src/two-phase-central-merge.cpp)
 
 find_package(ZLIB REQUIRED)
-
 target_link_libraries(generate
     ${CMAKE_SOURCE_DIR}/lib/duckdb/lib/libduckdb.so
     ZLIB::ZLIB
+)
+
+target_link_libraries(two-phase-central-merge
+    ${CMAKE_SOURCE_DIR}/lib/duckdb/lib/libduckdb.so
 )

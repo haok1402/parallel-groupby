@@ -1,6 +1,12 @@
 #!/bin/bash
 
-# Prepare the development environment.
+set -e
+
+if [[ "$(uname)" != "Linux" ]]; then
+    echo "Error: This script must be run on Linux." >&2
+    exit 1
+fi
+
 wget https://github.com/duckdb/duckdb/releases/download/v1.2.2/libduckdb-linux-amd64.zip
 unzip libduckdb-linux-amd64.zip && rm libduckdb-linux-amd64.zip
 
@@ -18,8 +24,3 @@ wget -O lib/indicators/include/indicators.hpp https://raw.githubusercontent.com/
 
 python3 -m venv venv
 venv/bin/pip install -r requirements.txt
-
-# Download the dataset for benchmarking purposes.
-wget -P data/ https://blobs.duckdb.org/data/tpch-sf1.db
-wget -P data/ https://blobs.duckdb.org/data/tpch-sf10.db
-wget -P data/ https://blobs.duckdb.org/data/tpch-sf100.db
