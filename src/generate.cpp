@@ -5,6 +5,7 @@
  * @date April 19, 2025
  */
 
+#include <regex>
 #include <random>
 #include <string>
 #include <sstream>
@@ -45,12 +46,23 @@ int main(int argc, char **argv)
         ->check(CLI::IsMember({"uniform", "normal", "exponential"}))
         ->default_val("uniform");
 
+    auto valid_count = CLI::Validator(
+        [](std::string &input) {
+            static const std::regex pattern(R"(^\d+[KMBT]?$)", std::regex::icase);
+            return std::regex_match(input, pattern) ? "" : std::string("Invalid format: must be an integer optionally ending in K, M, B, or T (e.g., 100K, 1M)");
+        }, 
+        "Must be an integer with optional K/M/B/T suffix", 
+        "valid_count"
+    );
+
     std::string num_rows_str = "1M";
     app.add_option("--num-rows", num_rows_str, "Number of rows in the table")
+        ->check(valid_count)
         ->default_val("1M");
 
     std::string num_groups_str = "1K";
     app.add_option("--num-groups", num_groups_str, "Number of groups in the distribution")
+        ->check(valid_count)
         ->default_val("1K");
 
     CLI11_PARSE(app, argc, argv);
