@@ -1,5 +1,13 @@
+#include <chrono>
+
 #include <zlib.h>
 #include <CLI11.hpp>
+
+void aggregate(std::vector<int>& data, int num_threads)
+{
+    (void)data;
+    (void)num_threads;
+}
 
 int main(int argc, char** argv)
 {
@@ -73,4 +81,21 @@ int main(int argc, char** argv)
      * Run the warmup steps.
      */
     std::cout << "Running " << warmup_steps << " warm-up iteration(s) to stabilize performance" << std::endl;
+    for (int i = 0; i < warmup_steps; i++) { aggregate(data, num_threads); }
+
+    /**
+     * Run the measure steps.
+     */
+    std::cout << "Running " << measure_steps << " evaluation iteration(s) for benchmarking" << std::endl;
+    auto t0 = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < measure_steps; i++) { aggregate(data, num_threads); }
+    auto t1 = std::chrono::high_resolution_clock::now();
+
+    /**
+     * Report the average timing across all steps.
+     */
+    std::chrono::duration<double, std::milli> elapsed = (t1 - t0) / measure_steps;
+    std::cout << std::fixed << std::setprecision(8)
+              << "Benchmark completed: Elapsed " << elapsed.count() / 1000.0
+              << "s" << std::endl;
 }
