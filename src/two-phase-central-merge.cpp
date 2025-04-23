@@ -1,10 +1,11 @@
 /**
  * @file two-phase-central-merge.cpp
  * @brief Each thread maintains a local aggregation map which gets merged by a single thread eventually.
- * @author Leon Lu <lianglu@andrew.cmu.edu>, Hao Kang <haok@andrew.cmu.edu>
+ * @author Hao Kang <haok@andrew.cmu.edu>, Leon Lu <lianglu@andrew.cmu.edu>
  * @date April 19, 2025
  */
 
+#include <omp.h>
 #include <chrono>
 
 #include <zlib.h>
@@ -12,8 +13,35 @@
 
 void aggregate(std::vector<int64_t>& data, int num_threads)
 {
-    (void)data;
-    (void)num_threads;
+    omp_set_num_threads(num_threads);
+    auto states = std::vector<std::unordered_map<int64_t, int64_t>>(num_threads);
+    std::unordered_map<int64_t, int64_t> merged;
+
+    #pragma omp parallel
+    {
+        int tid = omp_get_thread_num();
+        std::unordered_map<int64_t, int64_t>& map = states[tid];
+
+        #pragma omp for schedule(static)
+        for (size_t i = 0; i < data.size(); i += 2)
+        {
+            int64_t key = data[i], val = data[i + 1];
+            map[key] += val;
+        }
+
+        #pragma omp barrier
+        #pragma omp single
+        {
+            merged = std::move(states[0]);
+            for (int i = 1; i < num_threads; ++i)
+            {
+                for (auto& [key, val] : states[i])
+                {
+                    merged[key] += val;
+                }
+            }
+        }
+    }
 }
 
 int main(int argc, char** argv)

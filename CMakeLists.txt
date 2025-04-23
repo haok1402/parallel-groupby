@@ -24,6 +24,7 @@ include_directories(SYSTEM
 
 # Find and collect required libraries
 find_package(ZLIB REQUIRED)
+find_package(OpenMP REQUIRED)
 
 # Define executable targets and their sources
 add_executable(generate src/generate.cpp)
@@ -36,4 +37,5 @@ target_link_libraries(generate
 
 target_link_libraries(two-phase-central-merge 
     PRIVATE ZLIB::ZLIB
+    PRIVATE OpenMP::OpenMP_CXX
 )
