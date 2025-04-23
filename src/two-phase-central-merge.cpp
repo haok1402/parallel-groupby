@@ -75,6 +75,8 @@ int main(int argc, char** argv)
 
     CLI11_PARSE(app, argc, argv);
 
+    std::cout << "Testing with " << num_threads << " thread(s)" << std::endl;
+
     /**
      * Load dataset into memory.
      */
