@@ -1,3 +1,10 @@
+/**
+ * @file lock-free-hash-table.cpp
+ * @brief Lock-free concurrent group-by aggregation using a linear probing hash map with atomic upserts.
+ * @author Hao Kang <haok@andrew.cmu.edu>, Leon Lu <lianglu@andrew.cmu.edu>
+ * @date April 23, 2025
+ */
+
 #include <thread>
 #include <atomic>
 #include <cstdint>
