@@ -67,6 +67,7 @@ int main(int argc, char** argv)
     }
 
     gzclose(gz_input);
+    data.shrink_to_fit();
 
     /**
      * Run the warmup steps.
