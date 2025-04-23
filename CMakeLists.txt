@@ -29,6 +29,7 @@ find_package(OpenMP REQUIRED)
 # Define executable targets and their sources
 add_executable(generate src/generate.cpp)
 add_executable(two-phase-central-merge src/two-phase-central-merge.cpp)
+add_executable(lock-free-hash-table src/lock-free-hash-table.cpp)
 
 # Link dependencies for each target
 target_link_libraries(generate 
@@ -38,4 +39,8 @@ target_link_libraries(generate
 target_link_libraries(two-phase-central-merge 
     PRIVATE ZLIB::ZLIB
     PRIVATE OpenMP::OpenMP_CXX
+)
+
+target_link_libraries(lock-free-hash-table
+    PRIVATE ZLIB::ZLIB
 )
