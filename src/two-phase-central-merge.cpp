@@ -1,9 +1,16 @@
+/**
+ * @file two-phase-central-merge.cpp
+ * @brief Each thread maintains a local aggregation map which gets merged by a single thread eventually.
+ * @author Leon Lu <lianglu@andrew.cmu.edu>, Hao Kang <haok@andrew.cmu.edu>
+ * @date April 19, 2025
+ */
+
 #include <chrono>
 
 #include <zlib.h>
 #include <CLI11.hpp>
 
-void aggregate(std::vector<int>& data, int num_threads)
+void aggregate(std::vector<int64_t>& data, int num_threads)
 {
     (void)data;
     (void)num_threads;
@@ -53,7 +60,7 @@ int main(int argc, char** argv)
     constexpr size_t buffer_size = 4096;
     char buffer[buffer_size];
     std::string line;
-    std::vector<int> data;
+    std::vector<int64_t> data;
 
     if (gzgets(gz_input, buffer, buffer_size) == nullptr) {
         std::cerr << "Error: File is empty or failed to read header line." << std::endl;
@@ -67,9 +74,9 @@ int main(int argc, char** argv)
         std::string col1, col2;
 
         if (std::getline(iss, col1, ',') && std::getline(iss, col2)) {
-            int key = std::stoi(col1);
+            int64_t key = std::stoll(col1);
             data.push_back(key);
-            int val = std::stoi(col2);
+            int64_t val = std::stoll(col2);
             data.push_back(val);
         }
     }
