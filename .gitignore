@@ -7,3 +7,15 @@
 
 /.vscode/sftp.json
 /.vscode/settings.json
+
+.vscode
+src-go
+src-rs
+queries
+report
+out1.csv
+CMakeCache.txt
+cmake_install.cmake
+main
+Makefile
+CMakeFiles
