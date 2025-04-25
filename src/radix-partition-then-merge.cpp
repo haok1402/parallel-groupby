@@ -33,26 +33,23 @@ void aggregate(std::vector<int64_t>& data, int num_threads)
 
         #pragma omp barrier
         #pragma omp for schedule(dynamic)
-        for (int p = 0; p < num_partitions; p++)
+        for (int part_idx = 0; part_idx < num_partitions; part_idx++)
         {
-            for (int t = 0; t < num_threads; t++)
+            for (int other_tid = 1; other_tid < num_threads; other_tid++)
             {
-                std::unordered_map<int64_t, int64_t>& map = states[tid][p];
-                for (const auto& [key, val] : map)
-                {
-                    states[0][p][key] += val;
+                std::unordered_map<int64_t, int64_t>& other_local_agg_map = states[other_tid][part_idx];
+                for (const auto& [key, val] : other_local_agg_map) {
+                    states[0][part_idx][key] += val;
                 }
             }
         }
 
-        #pragma omp barrier
-        #pragma omp single
+    }
+    {
+        merged = std::move(states[0][0]);
+        for (int p = 1; p < num_partitions; p++)
         {
-            merged = std::move(states[0][0]);
-            for (int p = 1; p < num_partitions; p++)
-            {
-                merged.merge(states[0][p]);
-            }
+            merged.merge(states[0][p]);
         }
     }
 
