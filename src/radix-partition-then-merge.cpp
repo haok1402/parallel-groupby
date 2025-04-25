@@ -55,6 +55,8 @@ void aggregate(std::vector<int64_t>& data, int num_threads)
             }
         }
     }
+
+    std::cout << "Merged[0]: " << merged[0] << std::endl;
 }
 
 int main(int argc, char** argv)
