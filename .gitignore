@@ -19,3 +19,8 @@ cmake_install.cmake
 main
 Makefile
 CMakeFiles
+
+generate
+lock-free-hash-table
+radix-partition-then-merge
+two-phase-central-merge
