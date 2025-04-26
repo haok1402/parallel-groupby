@@ -25,7 +25,7 @@ void sequential_sol(ExpConfig &config, RowStore &table, int trial_idx, std::vect
     
     SimpleHashAggMap agg_map;
     for (size_t r = 0; r < n_rows; r++) {
-        agg_map.aggregate_into(table, r);
+        agg_map.accumulate_from_row(table, r);
     }
     
     t_agg_1 = std::chrono::steady_clock::now();

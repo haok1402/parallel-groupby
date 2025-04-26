@@ -85,7 +85,7 @@ public:
         return agg_map[group_key];
     }
     
-    inline void aggregate_into(RowStore &table, int r) {
+    inline void accumulate_from_row(RowStore &table, int r) {
         auto group_key = table.get(r, 0);
         
         // find existing entry, if not initialise
