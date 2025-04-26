@@ -1,3 +1,6 @@
+//! one header to rule the algorithms all
+//! include any algorithm here with the same signature
+
 #pragma once
 
 #include "../lib.hpp"

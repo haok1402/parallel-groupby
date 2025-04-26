@@ -11,10 +11,17 @@
 #include "lib.hpp"
 #include "algs/_all_algs.hpp"
 
-void print_spotcheck(std::vector<AggResRow> agg_res) {
+void validate_results(std::vector<AggResRow> agg_res, std::unordered_map<int64_t, AggMapValue> reference_agg_map) {
     for (const auto& row : agg_res) {
-        if (row[0] == 419 || row[0] == 3488 || row[0] == 5997667) { // spot checking
-            std::cout << row[0] << " -> (" << row[1] << ", " << row[2] << ")" << std::endl;
+        // if row in reference_agg_map, check each value equal
+        auto group_key = row[0];
+        if (auto search = reference_agg_map.find(group_key); search != reference_agg_map.end()) {
+            for (size_t i = 1; i < row.size(); ++i) {
+                if (row[i] != search->second[i-1]) {
+                    std::cerr << "Validation failed: group_key " << row[0] << ", column " << i << ", expect " << search->second[i-1] << ", got " << row[i] << std::endl;
+                    throw std::runtime_error("Results are wrong");
+                }
+            }
         }
     }
 }
@@ -38,6 +45,7 @@ int main(int argc, char *argv[]) {
     config.duckdb_style_adaptation_threshold = 10000;
     config.algorithm = "SEQUENTIAL";
     config.dataset_file_path = "data/exponential/100K-1K.csv.gz";
+    config.validation_file_path = "data/exponential/val-100K-1K.csv.gz";
     config.in_table_name = "lineitem";
     // for our own generated dataset, there's only a key column and a val column:
     config.group_key_col_name = "key";
@@ -54,9 +62,8 @@ int main(int argc, char *argv[]) {
     app.add_option("--batch_size", config.batch_size);
     std::string strat_str = "SEQUENTIAL";
     app.add_option("--algorithm", config.algorithm);
-    app.add_option("--dataset_file_path", config.dataset_file_path, "Path to the gzipped CSV input file (with two integer columns)")
-        ->check(CLI::ExistingFile)
-        ->required();
+    app.add_option("--dataset_file_path", config.dataset_file_path, "Path to the gzipped CSV input file (with two integer columns)")->check(CLI::ExistingFile)->required();
+    app.add_option("--validation_file_path", config.validation_file_path, "Path to sampled reference results")->check(CLI::ExistingFile)->required();
     app.add_option("--in_table_name", config.in_table_name);
     
     CLI11_PARSE(app, argc, argv);
@@ -95,9 +102,6 @@ int main(int argc, char *argv[]) {
         agg_res.clear();
         printf(">> --- running dryrun %d ---\n", dryrun_idx);
         selected_alg(config, table, dryrun_idx, agg_res);
-        if (dryrun_idx == 0) {
-            print_spotcheck(agg_res);
-        }
     }
 
     std::cout << "Running " << config.num_trials << " evaluation iteration(s) for benchmarking" << std::endl;
@@ -106,8 +110,15 @@ int main(int argc, char *argv[]) {
         agg_res.clear();
         selected_alg(config, table, trial_idx, agg_res);
     }
-    
-    print_agg_stats(agg_res);
+        
+    std::cout << "Validating results against reference" << std::endl;
+    auto reference_agg_map = load_valiadtion_data(config);
+    // std::cout << reference_agg_map[15][0] << std::endl;
+    // std::cout << reference_agg_map[15][1] << std::endl;
+    // std::cout << reference_agg_map[15][2] << std::endl;
+    // std::cout << reference_agg_map[15][3] << std::endl;
+    validate_results(agg_res, reference_agg_map);
+    std::cout << "Validation passes" << std::endl;
     
     return 0;
 }

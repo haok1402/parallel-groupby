@@ -1,5 +1,7 @@
 #include "../lib.hpp"
 
+// phase 1: each thread does local aggregation
+// phase 2: one thread merge them all
 void two_phase_centralised_merge_sol(ExpConfig &config, RowStore &table, int trial_idx, std::vector<AggResRow> &agg_res) {
     omp_set_num_threads(config.num_threads);
     
@@ -16,7 +18,6 @@ void two_phase_centralised_merge_sol(ExpConfig &config, RowStore &table, int tri
     chrono_time_point t_agg_1;
     chrono_time_point t_output_0;
     chrono_time_point t_output_1;
-
     
     t_overall_0 = std::chrono::steady_clock::now();
     t_agg_0 = std::chrono::steady_clock::now();
@@ -29,7 +30,6 @@ void two_phase_centralised_merge_sol(ExpConfig &config, RowStore &table, int tri
     {
         int tid = omp_get_thread_num();
         int actual_num_threads = omp_get_num_threads();
-        // printf("hello from thread %d among %d threads\n", tid, actual_num_threads);
         assert(actual_num_threads == config.num_threads);
         
         // PHASE 1: local aggregation map
@@ -37,7 +37,6 @@ void two_phase_centralised_merge_sol(ExpConfig &config, RowStore &table, int tri
         
         if (tid == 0) { t_phase1_0 = std::chrono::steady_clock::now(); }
         
-        // #pragma omp for schedule(dynamic, config.batch_size)
         #pragma omp for schedule(dynamic, config.batch_size)
         for (size_t r = 0; r < n_rows; r++) {
             auto group_key = table.get(r, 0);
@@ -87,7 +86,7 @@ void two_phase_centralised_merge_sol(ExpConfig &config, RowStore &table, int tri
             
             t_phase2_1 = std::chrono::steady_clock::now();
             time_print("phase_2", trial_idx, t_phase2_0, t_phase2_1);
-
+            
         }
     }
     

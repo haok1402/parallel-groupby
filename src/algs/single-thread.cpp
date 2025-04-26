@@ -1,4 +1,6 @@
 #include "../lib.hpp"
+#include <climits>
+#include <cstdint>
 
 void single_thread_sol(ExpConfig &config, RowStore &table, int trial_idx, std::vector<AggResRow> &agg_res) {
     assert(table.n_rows > 0);
@@ -6,9 +8,7 @@ void single_thread_sol(ExpConfig &config, RowStore &table, int trial_idx, std::v
     
     auto n_cols = table.n_cols;
     auto n_rows = table.n_rows;
-
-    
-    assert(n_cols == 3); // how to support dynamic col count?
+    assert(n_cols == 2);
     
     chrono_time_point t_overall_0;
     chrono_time_point t_overall_1;
@@ -29,12 +29,13 @@ void single_thread_sol(ExpConfig &config, RowStore &table, int trial_idx, std::v
         if (auto search = agg_map.find(group_key); search != agg_map.end()) {
             agg_acc = search->second;
         } else {
-            agg_acc = AggMapValue{0, 0};
+            agg_acc = AggMapValue{0, 0, INT64_MAX, INT64_MIN };
         }
 
-        for (size_t c = 1; c < n_cols; c++) {
-            agg_acc[c - 1] = agg_acc[c - 1] + table.get(r, c);
-        }
+        agg_acc[0] = agg_acc[0] + 1; // count
+        agg_acc[1] = agg_acc[1] + table.get(r, 1); // sum
+        agg_acc[2] = std::min(agg_acc[2], table.get(r, 1)); // min
+        agg_acc[3] = std::max(agg_acc[3], table.get(r, 1)); // max
         agg_map[group_key] = agg_acc;
     }
     
@@ -46,7 +47,7 @@ void single_thread_sol(ExpConfig &config, RowStore &table, int trial_idx, std::v
 
         // write output
         for (auto& [group_key, agg_acc] : agg_map) {
-            agg_res.push_back(AggResRow{group_key, agg_acc[0], agg_acc[1]});
+            agg_res.push_back(AggResRow{group_key, agg_acc[0], agg_acc[1], agg_acc[2], agg_acc[3]});
         }
         
         t_output_1 = std::chrono::steady_clock::now();

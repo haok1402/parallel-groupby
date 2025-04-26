@@ -79,6 +79,7 @@ public:
     int num_trials;
     int cardinality_reduction;
     std::string dataset_file_path;
+    std::string validation_file_path;
     std::string in_table_name;
     std::string group_key_col_name;
     std::vector<std::string> data_col_names;
@@ -91,6 +92,7 @@ public:
         std::cout << "duckdb_style_adaptation_threshold = " << duckdb_style_adaptation_threshold << std::endl;
         std::cout << "algorithm = " << algorithm << std::endl;
         std::cout << "dataset_file_path = " << dataset_file_path << std::endl;
+        std::cout << "validation_file_path = " << validation_file_path << std::endl;
         std::cout << "in_table_name = " << in_table_name << std::endl;
         std::cout << "group_key_col_name = " << group_key_col_name << std::endl;
         std::cout << "data_col_names = [";
@@ -105,8 +107,9 @@ public:
 // for now, assume one group column, and group key column is not any of the value columns
 void load_data(ExpConfig &config, RowStore &table);
 
-typedef std::array<int64_t, 2> AggMapValue; // TODO is there a way to not hard code the size?
-typedef std::array<int64_t, 2+1> AggResRow;   // TODO is there a way to not hard code the size?
+typedef std::array<int64_t, 4> AggMapValue; // stores count, sum, min, max
+typedef std::array<int64_t, 4+1> AggResRow; 
 
 
 void time_print(std::string title, int run_id, chrono_time_point start, chrono_time_point end);
+std::unordered_map<int64_t, AggMapValue> load_valiadtion_data(ExpConfig &config);
