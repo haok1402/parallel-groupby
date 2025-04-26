@@ -9,9 +9,7 @@
 #include <utility>
 #include "CLI11.hpp"
 #include "lib.hpp"
-#include "algs/two-phase-central-merge.hpp"
-#include "algs/single-thread.hpp"
-
+#include "algs/_all_algs.hpp"
 
 void print_spotcheck(std::vector<AggResRow> agg_res) {
     for (const auto& row : agg_res) {
