@@ -17,7 +17,7 @@ log_dir="logs/$exp_identifier/$machine_identifier"
 echo "We'll write outputs to $log_dir/"
 
 oob_engines=('duckdb' 'polars') # out of the box engines to benchmark
-algorithms=('sequential' 'two-phase-central-merge' 'global-lock' 'duckdbish-two-phase' 'implicit-repartitioning' 'three-phase-radix') # algorithms we implement
+algorithms=('sequential' 'two-phase-central-merge' 'global-lock' 'duckdbish-two-phase' 'implicit-repartitioning' 'three-phase-radix' 'two-phase-radix') # algorithms we implement
 distributions=('uniform' 'normal' 'exponential')
 size_configs=('1M-1K' '1M-10K')
 possible_np=(1 2 4 8 16 32 64 128)

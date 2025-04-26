@@ -83,6 +83,22 @@ generate dist="exponential" nrows="100K" ngroups="1K": build-cpp
     # create validation data
     duckdb -c "COPY (select * from (select key, count(val) as 'count', sum(val) as 'sum', min(val) as 'min', max(val) as 'max' from 'data/{{dist}}/{{nrows}}-{{ngroups}}.csv.gz' group by key order by key) using sample 100 rows (reservoir, 42)) to 'data/{{dist}}/val-{{nrows}}-{{ngroups}}.csv'"
 
+generate-all:
+    just generate uniform 8M 20K
+    just generate uniform 8M 200K
+    just generate uniform 8M 2M
+    
+    just generate uniform 80M 20K
+    just generate uniform 80M 200K
+    just generate uniform 80M 2M
+    just generate uniform 80M 20M
+    
+    just generate uniform 800M 20K
+    just generate uniform 800M 200K
+    just generate uniform 800M 2M
+    just generate uniform 800M 20M
+    just generate uniform 800M 200M
+    
 run-experiment exp_id machine_id max_np:
     echo -e "================================"
     echo -e "exp_id: {{exp_id}}"
