@@ -24,6 +24,7 @@ include_directories(SYSTEM
 
 # Define executables
 add_executable(generate src/generate.cpp)
+add_executable(main src/main.cpp)
 add_executable(two-phase-central-merge src/two-phase-central-merge.cpp)
 add_executable(lock-free-hash-table src/lock-free-hash-table.cpp)
 add_executable(radix-partition-then-merge src/radix-partition-then-merge.cpp)
@@ -53,6 +54,11 @@ if(APPLE)
         PRIVATE ${DUCKDB_LIB}
     )
     target_link_libraries(two-phase-central-merge 
+        PRIVATE ZLIB::ZLIB
+        PRIVATE ${DUCKDB_LIB}
+        PRIVATE ${OpenMP_omp_LIBRARY}
+    )
+    target_link_libraries(main
         PRIVATE ZLIB::ZLIB
         PRIVATE ${DUCKDB_LIB}
         PRIVATE ${OpenMP_omp_LIBRARY}
