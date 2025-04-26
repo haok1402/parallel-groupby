@@ -84,8 +84,8 @@ int main(int argc, char *argv[]) {
         selected_alg = two_phase_centralised_merge_sol;
     } else if (config.algorithm == "global-lock") {
         selected_alg = global_lock_sol;
-    // } else if (config.algorithm == "simple-two-phase-radix") {
-    //     selected_alg = simple_2phase_radix_partition_sol;
+    } else if (config.algorithm == "two-phase-radix") {
+        selected_alg = two_phase_radix_sol;
     } else if (config.algorithm == "duckdbish-two-phase") {
         selected_alg = duckdbish_two_phase_sol;
     } else if (config.algorithm == "implicit-repartitioning") {
