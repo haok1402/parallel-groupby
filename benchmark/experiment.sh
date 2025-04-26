@@ -19,7 +19,8 @@ echo "We'll write outputs to $log_dir/"
 oob_engines=('duckdb' 'polars') # out of the box engines to benchmark
 algorithms=('sequential' 'two-phase-central-merge' 'global-lock' 'duckdbish-two-phase' 'implicit-repartitioning' 'three-phase-radix' 'two-phase-radix') # algorithms we implement
 distributions=('uniform' 'normal' 'exponential')
-size_configs=('1M-1K' '1M-10K')
+size_configs=('8M-20K' '8M-200K' '8M-2M' '80M-20K' '80M-200K' '80M-2M' '80M-20M')
+#  '800M-20K' '800M-200K' '800M-2M' '800M-20M' '800M-200M'
 possible_np=(1 2 4 8 16 32 64 128)
 max_np=$3
 num_dryruns=3
