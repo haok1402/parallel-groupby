@@ -8,8 +8,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Use old ABI for compatibility
 add_definitions(-D_GLIBCXX_USE_CXX11_ABI=0)
 
-# Base compile options
-add_compile_options(-march=native -Wall -Wextra -Wpedantic)
 
 # Add Release-specific optimization
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
@@ -32,6 +30,8 @@ add_executable(radix-partition-then-merge src/radix-partition-then-merge.cpp)
 # Platform-specific setup
 if(APPLE)
     find_package(ZLIB REQUIRED)
+    # Base compile options
+    add_compile_options(-march=native)
 
     # DuckDB
     include_directories(/opt/homebrew/Cellar/duckdb/1.2.2/include)
@@ -49,6 +49,7 @@ if(APPLE)
     target_link_libraries(generate 
         PRIVATE ZLIB::ZLIB
         PRIVATE ${DUCKDB_LIB}
+        PRIVATE ${OpenMP_omp_LIBRARY}
     )
     target_link_libraries(two-phase-central-merge 
         PRIVATE ZLIB::ZLIB
@@ -60,12 +61,10 @@ if(APPLE)
         PRIVATE ${DUCKDB_LIB}
         PRIVATE ${OpenMP_omp_LIBRARY}
     )
-
     target_link_libraries(lock-free-hash-table
         PRIVATE ZLIB::ZLIB
         PRIVATE ${DUCKDB_LIB}
     )
-
     target_link_libraries(radix-partition-then-merge
         PRIVATE ZLIB::ZLIB
         PRIVATE ${DUCKDB_LIB}
@@ -73,6 +72,8 @@ if(APPLE)
     )
 
 else()
+    # Base compile options
+    add_compile_options(-march=native -Wall -Wextra -Wpedantic)
 
     find_package(ZLIB REQUIRED)
     find_package(OpenMP REQUIRED)
