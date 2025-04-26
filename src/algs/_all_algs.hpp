@@ -12,3 +12,4 @@ void duckdbish_two_phase_sol(ExpConfig &config, RowStore &table, int trial_idx, 
 void implicit_repartitioning_sol(ExpConfig &config, RowStore &table, int trial_idx, bool do_print_stats, std::vector<AggResRow> &agg_res);
 void three_phase_radix_sol(ExpConfig &config, RowStore &table, int trial_idx, bool do_print_stats, std::vector<AggResRow> &agg_res);
 void two_phase_radix_sol(ExpConfig &config, RowStore &table, int trial_idx, bool do_print_stats, std::vector<AggResRow> &agg_res);
+void lock_free_hash_table_sol(ExpConfig &config, RowStore &table, int trial_idx, bool do_print_stats, std::vector<AggResRow> &agg_res);
