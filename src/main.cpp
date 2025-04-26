@@ -82,8 +82,8 @@ int main(int argc, char *argv[]) {
         selected_alg = sequential_sol;
     } else if (config.algorithm == "two-phase-central-merge") {
         selected_alg = two_phase_centralised_merge_sol;
-    // } else if (config.algorithm == "global-lock") {
-    //     selected_alg = dumb_global_lock_sol;
+    } else if (config.algorithm == "global-lock") {
+        selected_alg = global_lock_sol;
     // } else if (config.algorithm == "simple-two-phase-radix") {
     //     selected_alg = simple_2phase_radix_partition_sol;
     // } else if (config.algorithm == "simple-three-phase-radix") {

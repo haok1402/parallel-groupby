@@ -27,3 +27,5 @@ src-rs/target
 .zed
 
 logs
+results/*.parquet
+results/*.pdf
