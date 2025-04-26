@@ -70,6 +70,8 @@ if(APPLE)
     )
 
 else()
+    find_package(OpenMP REQUIRED)
+
     # Link dependencies for each target
     target_link_libraries(generate 
         PRIVATE ZLIB::ZLIB
