@@ -14,6 +14,18 @@
 #include <CLI11.hpp>
 #include <indicators.hpp>
 
+/**
+ * @brief Flush the cached output to a gzip file safely.
+ *
+ * Writes the stringstream (oss) to the gzip file (file) inside an OpenMP critical section,
+ * updates the progress bar (bar), then clears the cache (oss) and resets cache_size.
+ *
+ * @param file Gzip file handle.
+ * @param oss  Output stringstream holding buffered data.
+ * @param bar  Progress bar to update.
+ * @param p    Progress counter (number of rows written).
+ * @param cache_size Number of rows currently in cache.
+ */
 #define FLUSH_CACHE(file, oss, bar, p, cache_size)     \
     _Pragma("omp critical")                            \
     {                                                  \
@@ -23,7 +35,7 @@
     }                                                  \
     (oss).str(std::string());                          \
     (oss).clear();                                     \
-    (cache_size) = 0;
+    (cache_size) = 0;                                  \
 
 /**
  * @brief Parse a string representing an integer count with an optional suffix (K, M, B, T).
@@ -90,18 +102,6 @@ int main(int argc, char** argv)
         ->check(valid_count)
         ->default_val("1K");
 
-    double mean = 0.0;
-    app.add_option("--mean", mean, "Mean for normal distribution (default: 0.0)")
-        ->default_val(0.0);
-
-    double stddev = 1.0;
-    app.add_option("--stddev", stddev, "Standard deviation for normal distribution (default: 1.0)")
-        ->default_val(1.0);
-
-    double lambda = 5.0;
-    app.add_option("--lambda", lambda, "Lambda for exponential distribution (default: 5.0)")
-        ->default_val(5.0);
-
     CLI11_PARSE(app, argc, argv);
 
     size_t num_rows = parse_count(num_rows_str);
@@ -119,17 +119,8 @@ int main(int argc, char** argv)
     std::ostringstream oss;
 
     oss << "data" << "/" << distribution;
+    std::filesystem::create_directories(oss.str());
 
-    if (distribution == "normal")
-    {
-        oss << "/" << mean << "-" << stddev;
-    }
-    else if (distribution == "exponential")
-    {
-        oss << "/" << lambda;
-    }
-
-    std::filesystem::create_directory(oss.str());
     oss << "/" << num_rows_str << "-" << num_groups_str << ".csv.gz";
     std::string path = oss.str();
 
@@ -192,16 +183,18 @@ int main(int argc, char** argv)
             std::ostringstream oss;
             size_t cache_size = 0;
 
+            // Ensure each group has at least one row
             #pragma omp for
             for (size_t i = 0; i < num_groups; i++)
             {
-                int64_t key = key_distribution(gen);
+                int64_t key = i;
                 int16_t val = val_distribution(gen);
                 oss << key << "," << val << "\n";
                 if (++cache_size >= batch_size) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
             }
             if (cache_size > 0) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
 
+            // Remaining rows follow specified distribution
             #pragma omp for
             for (size_t i = 0; i < num_rows - num_groups; ++i)
             {
@@ -213,8 +206,76 @@ int main(int argc, char** argv)
             if (cache_size > 0) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
         }
     }
+    else if (distribution == "normal")
+    {
+        #pragma omp parallel
+        {
+            std::random_device rd;
+            std::mt19937 gen(rd());
+            std::normal_distribution<> key_distribution(static_cast<double>(num_groups) / 2.0, static_cast<double>(num_groups) / 8.0);
+            std::uniform_int_distribution<int16_t> val_distribution(0, std::numeric_limits<int16_t>::max());
+            std::ostringstream oss;
+            size_t cache_size = 0;
 
-    bar.set_progress(num_rows);
+            // Ensure each group has at least one row
+            #pragma omp for
+            for (size_t i = 0; i < num_groups; i++)
+            {
+                int64_t key = i;
+                int16_t val = val_distribution(gen);
+                oss << key << "," << val << "\n";
+                if (++cache_size >= batch_size) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
+            }
+            if (cache_size > 0) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
+
+            // Remaining rows follow specified distribution
+            #pragma omp for
+            for (size_t i = 0; i < num_rows - num_groups; ++i)
+            {
+                size_t key;
+                do { key = static_cast<size_t>(std::llround(key_distribution(gen))); } while (key >= num_groups); 
+                int16_t val = val_distribution(gen);
+                oss << key << "," << val << "\n";
+                if (++cache_size >= batch_size) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
+            }
+            if (cache_size > 0) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
+        }
+    }
+    else if (distribution == "exponential")
+    {
+        #pragma omp parallel
+        {
+            std::random_device rd;
+            std::mt19937 gen(rd());
+            std::exponential_distribution<> key_distribution(1.0 / (0.3 * num_groups));
+            std::uniform_int_distribution<int16_t> val_distribution(0, std::numeric_limits<int16_t>::max());
+            std::ostringstream oss;
+            size_t cache_size = 0;
+
+            // Ensure each group has at least one row
+            #pragma omp for
+            for (size_t i = 0; i < num_groups; i++)
+            {
+                size_t key = i;
+                int16_t val = val_distribution(gen);
+                oss << key << "," << val << "\n";
+                if (++cache_size >= batch_size) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
+            }
+            if (cache_size > 0) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
+
+            // Remaining rows follow specified distribution
+            #pragma omp for
+            for (size_t i = 0; i < num_rows - num_groups; ++i)
+            {
+                size_t key;
+                do { key = static_cast<size_t>(key_distribution(gen)); } while (key >= num_groups);
+                int16_t val = val_distribution(gen);
+                oss << key << "," << val << "\n";
+                if (++cache_size >= batch_size) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
+            }
+            if (cache_size > 0) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
+        }
+    }
 
     /**
      * Close the gzip file
