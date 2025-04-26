@@ -24,8 +24,6 @@ include_directories(SYSTEM
 add_executable(generate src/generate.cpp)
 file(GLOB ALL_ALGS "src/algs/*.cpp")
 add_executable(main src/main.cpp src/lib.cpp ${ALL_ALGS})
-add_executable(lock-free-hash-table src/lock-free-hash-table.cpp)
-add_executable(radix-partition-then-merge src/radix-partition-then-merge.cpp)
 
 # Platform-specific setup
 if(APPLE)
@@ -55,19 +53,10 @@ if(APPLE)
         PRIVATE ${DUCKDB_LIB}
         PRIVATE ${OpenMP_omp_LIBRARY}
     )
-    target_link_libraries(lock-free-hash-table
-        PRIVATE ZLIB::ZLIB
-        PRIVATE ${DUCKDB_LIB}
-    )
-    target_link_libraries(radix-partition-then-merge
-        PRIVATE ZLIB::ZLIB
-        PRIVATE ${DUCKDB_LIB}
-        PRIVATE ${OpenMP_omp_LIBRARY}
-    )
 
 else()
     # Base compile options
-    add_compile_options(-march=native -Wall -Wextra -Wpedantic)
+    add_compile_options(-march=native -Wall -Wextra -Wpedantic -lstdc++fs)
 
     find_package(ZLIB REQUIRED)
     find_package(OpenMP REQUIRED)
@@ -75,18 +64,15 @@ else()
     target_link_libraries(generate 
         PRIVATE ZLIB::ZLIB
         PRIVATE OpenMP::OpenMP_CXX
+        stdc++fs
     )
     target_link_libraries(main 
         PRIVATE ZLIB::ZLIB
         PRIVATE OpenMP::OpenMP_CXX
+        PRIVATE ${CMAKE_SOURCE_DIR}/lib/duckdb/lib/libduckdb.so
     )
-    target_link_libraries(lock-free-hash-table
-        PRIVATE ZLIB::ZLIB
-    )
-    target_link_libraries(radix-partition-then-merge
-        PRIVATE ZLIB::ZLIB
-        PRIVATE OpenMP::OpenMP_CXX
-    )
+    target_include_directories(main PRIVATE ${CMAKE_SOURCE_DIR}/lib/duckdb/include)
+    set(OpenMP_CXX_FLAGS "-Xpreprocessor -fopenmp -I/usr/lib/gcc/x86_64-linux-gnu/13/include/ -I/opt/packages/openmpi/gnu/5.0.3-gcc13.2.1-cpu/include -I./lib/cli11/include -I../lib/cli11/include -I./lib/duckdb/include -I../lib/duckdb/include")
 
 endif()
 
