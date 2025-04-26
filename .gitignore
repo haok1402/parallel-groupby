@@ -9,8 +9,6 @@
 /.vscode/settings.json
 
 .vscode
-src-go
-src-rs
 queries
 report
 out1.csv
@@ -24,3 +22,5 @@ generate
 lock-free-hash-table
 radix-partition-then-merge
 two-phase-central-merge
+
+src-rs/target
