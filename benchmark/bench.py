@@ -63,16 +63,14 @@ def bench_polars(args):
     
     logger.info(f"timing {args.num_trials} trial runs")
     
-    t_start = time.time()
     for i in range(args.num_trials):
+        t_start = time.time()
         df.sql(sql_str)
-    t_end = time.time()
-    
-    # 5 > print out stats
-    t_total = t_end - t_start
+        t_end = time.time()
+        t_elapsed = t_end - t_start
+        print(f">>> run={i}, elapsed_time={t_elapsed*1000:.2f}ms")
     
     logger.success("done with trials")
-    print(f"{args.num_trials} trials average is {t_total/args.num_trials:.6f} seconds to run on {args.num_threads} threads")
 
 def bench_duckdb(args):    
     # 1 > load in the data

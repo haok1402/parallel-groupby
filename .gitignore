@@ -25,3 +25,5 @@ two-phase-central-merge
 
 src-rs/target
 .zed
+
+logs
