@@ -42,8 +42,8 @@ def bench_polars(args):
     logger.info(f"pl threadpool size = {pl.thread_pool_size()}")
     
     # 1 > load in the data
-    con = duckdb.connect(args.in_db, read_only = True)
-    df = con.sql("select l_orderkey, l_partkey, l_suppkey from lineitem").pl()
+    con = duckdb.connect(':memory:', config={'threads': args.num_threads})
+    df = con.sql(f"SELECT * from '{args.dataset_file_path}'").pl()
     logger.info(f"df shape = {df.shape}")
     
     # 2 > make sql query
@@ -74,11 +74,9 @@ def bench_polars(args):
     logger.success("done with trials")
     print(f"{args.num_trials} trials average is {t_total/args.num_trials:.6f} seconds to run on {args.num_threads} threads")
 
-def bench_duckdb(args):
-    import duckdb as db
-    
+def bench_duckdb(args):    
     # 1 > load in the data
-    con = db.connect(':memory:', config={'threads': args.num_threads})
+    con = duckdb.connect(':memory:', config={'threads': args.num_threads})
     con.sql(f"CREATE TEMP TABLE in_table AS SELECT * from '{args.dataset_file_path}';")
     # con.sql("SET threads TO 4;")
     logger.info("loaded data into memory")
