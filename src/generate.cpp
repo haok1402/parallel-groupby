@@ -14,6 +14,8 @@
 #include <CLI11.hpp>
 #include <indicators.hpp>
 
+const int SEED = 42;
+
 /**
  * @brief Flush the cached output to a gzip file safely.
  *
@@ -154,7 +156,7 @@ int main(int argc, char** argv)
     /**
      * Open the gzip file for writing
      */
-    gzFile file = gzopen64(path.c_str(), "wb");
+    gzFile file = gzopen(path.c_str(), "wb");
     if (file == nullptr)
     {
         std::cerr << "Error: Failed to open " << path << " for gzip writing.\n";
@@ -176,8 +178,7 @@ int main(int argc, char** argv)
     {
         #pragma omp parallel
         {
-            std::random_device rd;
-            std::mt19937 gen(rd());
+            std::mt19937 gen(SEED + omp_get_thread_num());
             std::uniform_int_distribution<int64_t> key_distribution(0, num_groups - 1);
             std::uniform_int_distribution<int16_t> val_distribution(0, std::numeric_limits<int16_t>::max());
             std::ostringstream oss;
@@ -210,8 +211,7 @@ int main(int argc, char** argv)
     {
         #pragma omp parallel
         {
-            std::random_device rd;
-            std::mt19937 gen(rd());
+            std::mt19937 gen(SEED + omp_get_thread_num());
             std::normal_distribution<> key_distribution(static_cast<double>(num_groups) / 2.0, static_cast<double>(num_groups) / 8.0);
             std::uniform_int_distribution<int16_t> val_distribution(0, std::numeric_limits<int16_t>::max());
             std::ostringstream oss;
@@ -245,8 +245,7 @@ int main(int argc, char** argv)
     {
         #pragma omp parallel
         {
-            std::random_device rd;
-            std::mt19937 gen(rd());
+            std::mt19937 gen(SEED + omp_get_thread_num());
             std::exponential_distribution<> key_distribution(1.0 / (0.3 * num_groups));
             std::uniform_int_distribution<int16_t> val_distribution(0, std::numeric_limits<int16_t>::max());
             std::ostringstream oss;

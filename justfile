@@ -66,6 +66,9 @@ tmp-run-cpp-bench strat="SIMPLE_THREE_PHASE_RADIX" max_core="8" cardinality_redu
         ./main --num_threads $np $config_args | grep ">>"
     done
 
+generate dist="exponential" nrows="100K" ngroups="1K": build-cpp
+    ./generate --distribution {{dist}} --num-rows {{nrows}} --num-groups {{ngroups}}
+
 [working-directory: 'src-go']
 @run-go:
     go run main.go
