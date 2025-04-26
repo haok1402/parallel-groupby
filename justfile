@@ -106,8 +106,8 @@ run-experiment exp_id machine_id max_np:
     echo -e "max_np: {{max_np}}"
     echo -e "================================"
     bash benchmark/experiment.sh {{exp_id}} {{machine_id}} {{max_np}}
-    python benchmark/extract.py -eid dev0
-    python analysis/exp-plot-all.py -eid dev0
+    python benchmark/extract.py -eid {{exp_id}}
+    python analysis/exp-plot-all.py -eid {{exp_id}}
     
 [working-directory: 'src-go']
 @run-go:
