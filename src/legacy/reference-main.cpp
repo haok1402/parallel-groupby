@@ -172,8 +172,10 @@ void load_data(ExpConfig &config, RowStore &table) {
 typedef std::array<int64_t, 2> AggMapValue; // TODO is there a way to not hard code the size?
 typedef std::array<int64_t, 2+1> AggResRow;   // TODO is there a way to not hard code the size?
 
-void time_print(std::string title, int run_id, chrono_time_point start, chrono_time_point end) {
-    std::cout << ">>> run=" << run_id << ", " << title << "=" << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms" << std::endl;
+void time_print(std::string title, int run_id, chrono_time_point start, chrono_time_point end, bool do_print_stats) {
+    if (do_print_stats) {
+        std::cout << ">>> run=" << run_id << ", " << title << "=" << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms" << std::endl;
+    }
 }
 
 // requires table to be populated and in memory

@@ -2,7 +2,7 @@
 
 #include "../lib.hpp"
 
-void sequential_sol(ExpConfig &config, RowStore &table, int trial_idx, std::vector<AggResRow> &agg_res) {
+void sequential_sol(ExpConfig &config, RowStore &table, int trial_idx, bool do_print_stats, std::vector<AggResRow> &agg_res) {
     assert(table.n_rows > 0);
     assert(table.n_cols > 0);
     
@@ -29,7 +29,7 @@ void sequential_sol(ExpConfig &config, RowStore &table, int trial_idx, std::vect
     }
     
     t_agg_1 = std::chrono::steady_clock::now();
-    time_print("aggregation_time", trial_idx, t_agg_0, t_agg_1);
+    time_print("aggregation_time", trial_idx, t_agg_0, t_agg_1, do_print_stats);
     
     
     
@@ -40,12 +40,12 @@ void sequential_sol(ExpConfig &config, RowStore &table, int trial_idx, std::vect
             agg_res.push_back(AggResRow{group_key, agg_acc[0], agg_acc[1], agg_acc[2], agg_acc[3]});
         }
         t_output_1 = std::chrono::steady_clock::now();
-        time_print("write_output", trial_idx, t_output_0, t_output_1);
+        time_print("write_output", trial_idx, t_output_0, t_output_1, do_print_stats);
     }
 
     
     
     t_overall_1 = std::chrono::steady_clock::now();
-    time_print("elapsed_time", trial_idx, t_overall_0, t_overall_1);
+    time_print("elapsed_time", trial_idx, t_overall_0, t_overall_1, do_print_stats);
 
 }

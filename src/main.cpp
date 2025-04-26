@@ -76,7 +76,7 @@ int main(int argc, char *argv[]) {
     load_data(config, table);
     std::vector<AggResRow> agg_res; // where to write results to
     
-    std::function<void(ExpConfig &config, RowStore &table, int trial_idx, std::vector<AggResRow> &agg_res)> selected_alg;
+    std::function<void(ExpConfig &config, RowStore &table, int trial_idx, bool do_print_stats, std::vector<AggResRow> &agg_res)> selected_alg;
     
     if (config.algorithm == "sequential") {
         selected_alg = sequential_sol;
@@ -101,14 +101,14 @@ int main(int argc, char *argv[]) {
     for (int dryrun_idx = 0; dryrun_idx < config.num_dryruns; dryrun_idx++) {
         agg_res.clear();
         printf(">> --- running dryrun %d ---\n", dryrun_idx);
-        selected_alg(config, table, dryrun_idx, agg_res);
+        selected_alg(config, table, dryrun_idx, false, agg_res);
     }
 
     std::cout << "Running " << config.num_trials << " evaluation iteration(s) for benchmarking" << std::endl;
     for (int trial_idx = 0; trial_idx < config.num_trials; trial_idx++) {
         printf(">> --- running trial %d ---\n", trial_idx);
         agg_res.clear();
-        selected_alg(config, table, trial_idx, agg_res);
+        selected_alg(config, table, trial_idx, true, agg_res);
     }
         
     std::cout << "Validating results against reference" << std::endl;

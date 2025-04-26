@@ -2,7 +2,7 @@
 
 // phase 1: each thread does local aggregation
 // phase 2: one thread merge them all
-void two_phase_centralised_merge_sol(ExpConfig &config, RowStore &table, int trial_idx, std::vector<AggResRow> &agg_res) {
+void two_phase_centralised_merge_sol(ExpConfig &config, RowStore &table, int trial_idx, bool do_print_stats, std::vector<AggResRow> &agg_res) {
     omp_set_num_threads(config.num_threads);
     
     auto n_cols = table.n_cols;
@@ -47,7 +47,7 @@ void two_phase_centralised_merge_sol(ExpConfig &config, RowStore &table, int tri
         #pragma omp barrier
         if (tid == 0) {
             t_phase1_1 = std::chrono::steady_clock::now();
-            time_print("phase_1", trial_idx, t_phase1_0, t_phase1_1);
+            time_print("phase_1", trial_idx, t_phase1_0, t_phase1_1, do_print_stats);
         }
         
         
@@ -63,12 +63,12 @@ void two_phase_centralised_merge_sol(ExpConfig &config, RowStore &table, int tri
             }
             
             t_phase2_1 = std::chrono::steady_clock::now();
-            time_print("phase_2", trial_idx, t_phase2_0, t_phase2_1);
+            time_print("phase_2", trial_idx, t_phase2_0, t_phase2_1, do_print_stats);
         }
     }
     
     t_agg_1 = std::chrono::steady_clock::now();
-    time_print("aggregation_time", trial_idx, t_agg_0, t_agg_1);
+    time_print("aggregation_time", trial_idx, t_agg_0, t_agg_1, do_print_stats);
     
     
     
@@ -79,10 +79,10 @@ void two_phase_centralised_merge_sol(ExpConfig &config, RowStore &table, int tri
             agg_res.push_back(AggResRow{group_key, agg_acc[0], agg_acc[1], agg_acc[2], agg_acc[3]});
         }
         t_output_1 = std::chrono::steady_clock::now();
-        time_print("write_output", trial_idx, t_output_0, t_output_1);
+        time_print("write_output", trial_idx, t_output_0, t_output_1, do_print_stats);
     }
     
     t_overall_1 = std::chrono::steady_clock::now();
-    time_print("elapsed_time", trial_idx, t_overall_0, t_overall_1);
+    time_print("elapsed_time", trial_idx, t_overall_0, t_overall_1, do_print_stats);
 
 }

@@ -53,6 +53,8 @@ std::unordered_map<int64_t, AggMapValue> load_valiadtion_data(ExpConfig &config)
     return reference_agg_map;
 }
 
-void time_print(std::string title, int run_id, chrono_time_point start, chrono_time_point end) {
-    std::cout << ">>> run=" << run_id << ", " << title << "=" << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms" << std::endl;
+void time_print(std::string title, int run_id, chrono_time_point start, chrono_time_point end, bool do_print_stats) {
+    if (do_print_stats) {
+        std::cout << ">>> run=" << run_id << ", " << title << "=" << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms" << std::endl;
+    }
 }

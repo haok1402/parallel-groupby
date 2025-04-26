@@ -181,5 +181,5 @@ void load_data(ExpConfig &config, RowStore &table);
 
 
 
-void time_print(std::string title, int run_id, chrono_time_point start, chrono_time_point end);
+void time_print(std::string title, int run_id, chrono_time_point start, chrono_time_point end, bool do_print_stats);
 std::unordered_map<int64_t, AggMapValue> load_valiadtion_data(ExpConfig &config);

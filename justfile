@@ -1,6 +1,6 @@
 # - engine choices are duckdb, polars for now
 # - dbfile should point to a duckdb database file
-bench engine="duckdb" max_core="8" dbfile="data/tpch-sf1.db":
+bench engine="duckdb" max_core="8" dbfile="data/exponential/1M-1K.csv.gz":
     #!/bin/bash
     dbfile={{dbfile}}
     engine={{engine}}
@@ -54,6 +54,10 @@ run-cpp: build-cpp
     # ./main --num_threads 8 --strategy SIMPLE_TWO_PHASE_RADIX
     # ./main --num_threads 4 --algorithm single-thread --dataset_file_path data/exponential/100K-1K.csv.gz --num_dryruns 1 --num_trials 1
     ./main --num_threads 1 --algorithm two-phase-central-merge --dataset_file_path data/exponential/20-10.csv.gz --num_dryruns 1 --num_trials 1 --validation_file_path data/exponential/val-20-10.csv
+
+example-bench-cmds:
+    python benchmark/bench.py -np 2 -i data/exponential/1M-1K.csv.gz -e duckdb -q --num_dryruns 3 --num_trials 5
+    ./main --num_threads 2 --algorithm two-phase-central-merge --dataset_file_path data/exponential/1M-1K.csv.gz --num_dryruns 1 --num_trials 1 --validation_file_path data/exponential/val-1M-1K.csv
 
 tmp-run-cpp-bench strat="SIMPLE_THREE_PHASE_RADIX" max_core="8" cardinality_reduction="-1": build-cpp
     #!/bin/bash
