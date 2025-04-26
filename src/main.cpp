@@ -113,10 +113,6 @@ int main(int argc, char *argv[]) {
         
     std::cout << "Validating results against reference" << std::endl;
     auto reference_agg_map = load_valiadtion_data(config);
-    // std::cout << reference_agg_map[15][0] << std::endl;
-    // std::cout << reference_agg_map[15][1] << std::endl;
-    // std::cout << reference_agg_map[15][2] << std::endl;
-    // std::cout << reference_agg_map[15][3] << std::endl;
     validate_results(agg_res, reference_agg_map);
     std::cout << "Validation passes" << std::endl;
     
