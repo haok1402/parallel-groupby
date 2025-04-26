@@ -77,7 +77,6 @@ generate dist="exponential" nrows="100K" ngroups="1K": build-cpp
     ./generate --distribution {{dist}} --num-rows {{nrows}} --num-groups {{ngroups}}
     # create validation data
     duckdb -c "COPY (select * from (select key, count(val) as 'count', sum(val) as 'sum', min(val) as 'min', max(val) as 'max' from 'data/{{dist}}/{{nrows}}-{{ngroups}}.csv.gz' group by key order by key) using sample 100 rows (reservoir, 42)) to 'data/{{dist}}/val-{{nrows}}-{{ngroups}}.csv'"
-    # using sample 100 rows (reservoir, 42)
 
 [working-directory: 'src-go']
 @run-go:

@@ -8,6 +8,8 @@
 #include <string>
 
 typedef std::chrono::time_point<std::chrono::steady_clock> chrono_time_point;
+typedef std::array<int64_t, 4> AggMapValue; // stores count, sum, min, max
+typedef std::array<int64_t, 4+1> AggResRow; 
 
 // column major data storage
 // usage: first reserve all memory, then write to each cell
@@ -66,6 +68,48 @@ public:
     }
 };
 
+// wrapper around hash map with some useful row-level features
+class SimpleHashAggMap {
+public:
+    std::unordered_map<int64_t, AggMapValue> agg_map;
+    
+    inline AggMapValue entry_or_default(int64_t group_key) {
+        if (auto search = agg_map.find(group_key); search != agg_map.end()) {
+            return search->second;
+        } else {
+            return AggMapValue{0, 0, INT64_MAX, INT64_MIN };
+        }
+    }
+    
+    inline AggMapValue& operator[](int64_t group_key) {
+        return agg_map[group_key];
+    }
+    
+    inline void aggregate_into(RowStore &table, int r) {
+        auto group_key = table.get(r, 0);
+        
+        // find existing entry, if not initialise
+        AggMapValue agg_acc = entry_or_default(group_key);
+
+        // do the aggregation
+        agg_acc[0] = agg_acc[0] + 1; // count
+        agg_acc[1] = agg_acc[1] + table.get(r, 1); // sum
+        agg_acc[2] = std::min(agg_acc[2], table.get(r, 1)); // min
+        agg_acc[3] = std::max(agg_acc[3], table.get(r, 1)); // max
+        
+        agg_map[group_key] = agg_acc;
+    }
+    
+    // iterator wrapper implementation referenced https://stackoverflow.com/questions/20681150/should-i-write-iterators-for-a-class-that-is-just-a-wrapper-of-a-vector
+    typedef typename std::unordered_map<int64_t, AggMapValue>::iterator iterator;
+    typedef typename std::unordered_map<int64_t, AggMapValue>::const_iterator const_iterator;
+    iterator begin() { return agg_map.begin(); }
+    const_iterator begin() const { return agg_map.begin(); }
+    const_iterator cbegin() const { return agg_map.cbegin(); }
+    iterator end() { return agg_map.end(); }
+    const_iterator end() const { return agg_map.end(); }
+    const_iterator cend() const { return agg_map.cend(); }
+};
 
 // experiment config, including input file, what to group, what to aggregate, etc.
 class ExpConfig {
@@ -107,8 +151,6 @@ public:
 // for now, assume one group column, and group key column is not any of the value columns
 void load_data(ExpConfig &config, RowStore &table);
 
-typedef std::array<int64_t, 4> AggMapValue; // stores count, sum, min, max
-typedef std::array<int64_t, 4+1> AggResRow; 
 
 
 void time_print(std::string title, int run_id, chrono_time_point start, chrono_time_point end);
