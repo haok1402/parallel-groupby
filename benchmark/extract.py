@@ -64,7 +64,10 @@ def main():
     pattern = f'logs/{args.experiment_id}/*/*.log'
     for log_filepath in glob.glob(pattern):
         logger.info(f'parsing: {log_filepath}')
-        dfs.append(parse_one_log(args, log_filepath))
+        parsed_df = parse_one_log(args, log_filepath)
+        if (len(parsed_df) == 0):
+            logger.warn(f"didn't parse any data from {log_filepath} ... might still be running")
+        dfs.append(parsed_df)
         
     df = pl.concat(dfs)
     df.write_parquet(f'results/{args.experiment_id}.parquet')
