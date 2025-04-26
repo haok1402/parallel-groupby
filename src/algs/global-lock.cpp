@@ -14,9 +14,9 @@ void global_lock_sol(ExpConfig &config, RowStore &table, int trial_idx, bool do_
     chrono_time_point t_agg_1;
     chrono_time_point t_output_0;
     chrono_time_point t_output_1;
-
     t_overall_0 = std::chrono::steady_clock::now();
 
+    
     
     t_agg_0 = std::chrono::steady_clock::now();
     SimpleHashAggMap agg_map;
@@ -40,6 +40,8 @@ void global_lock_sol(ExpConfig &config, RowStore &table, int trial_idx, bool do_
     t_agg_1 = std::chrono::steady_clock::now();
     time_print("aggregation_time", trial_idx, t_agg_0, t_agg_1, do_print_stats);
 
+    
+    
     // write output to vector
     {
         t_output_0 = std::chrono::steady_clock::now();
