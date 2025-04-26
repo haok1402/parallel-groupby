@@ -86,12 +86,12 @@ int main(int argc, char *argv[]) {
         selected_alg = global_lock_sol;
     // } else if (config.algorithm == "simple-two-phase-radix") {
     //     selected_alg = simple_2phase_radix_partition_sol;
-    // } else if (config.algorithm == "simple-three-phase-radix") {
-    //     selected_alg = simple_3phase_radix_partition_sol;
-    // } else if (config.algorithm == "implicit-repartitioning") {
-    //     selected_alg = implicit_repartitioning_sol;
-    // } else if (config.algorithm == "duckdbish-two_phase") {
-    //     selected_alg = duckdb_style_2phase_adaptation_sol;
+    } else if (config.algorithm == "duckdbish-two-phase") {
+        selected_alg = duckdbish_two_phase_sol;
+    } else if (config.algorithm == "implicit-repartitioning") {
+        selected_alg = implicit_repartitioning_sol;
+    } else if (config.algorithm == "three-phase-radix") {
+        selected_alg = three_phase_radix_sol;
     } else {
         throw std::runtime_error("Unsupported algorithm");
     }
