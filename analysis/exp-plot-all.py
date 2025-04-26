@@ -71,7 +71,7 @@ logger.info(f"max num threads is {max_np}, will use as y max for speedup plots?"
 
 logger.info("start plotting")
 
-# # 3 > overall latency plot
+# 3 > overall latency plot
 
 plot_df = results_df.sql(f"""--sql
     select algorithm, np, size_config, dist, machine_id, avg_time as latency from self
@@ -155,3 +155,27 @@ g.add_legend()
 g.figure.suptitle("Aggregation Speedup vs Num Threads", y=1.03)
 g.figure.savefig(f"results/{exp_id}-agg-speedup.pdf")
 logger.success(f"saved results/{exp_id}-agg-speedup.pdf")
+
+# 6 > per phase latency
+
+plot_df = results_df.sql(f"""--sql
+    select machine_id, dist, size_config, algorithm, np, attribute as phase, avg_time as latency from self
+    where 
+        (attribute = 'phase_0' or attribute = 'phase_1' or attribute = 'phase_2' or attribute = 'phase_3')
+""")
+with pl.Config(tbl_cols=999):
+    print(plot_df)
+
+g = sns.FacetGrid(plot_df, col="size_config", row='dist', height=3, aspect=1.5)
+g.map_dataframe(sns.lineplot,     
+    x='np',
+    y='latency',
+    hue='algorithm',
+    size='machine_id',
+    style='phase',
+)
+g.set(xlim=(1, None), ylim=(0, None))
+g.add_legend()
+g.figure.suptitle("Elapsed Time vs Num Threads", y=1.03)
+g.figure.savefig(f"results/{exp_id}-phase-latency.pdf")
+logger.success(f"saved results/{exp_id}-phase-latency.pdf")
