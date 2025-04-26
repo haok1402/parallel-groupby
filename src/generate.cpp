@@ -143,14 +143,19 @@ int main(int argc, char **argv)
     }
     else if (distribution == "normal")
     {
-        std::normal_distribution<> key_distribution(num_groups / 2.0, num_groups / 5.0);
+        std::normal_distribution<> key_distribution(
+            static_cast<double>(num_groups) / 2.0,
+            static_cast<double>(num_groups) / 8.0
+        );
         for (size_t i = 0; i < num_rows - num_groups; ++i)
         {
+            size_t group_key;
+            do { group_key = static_cast<size_t>(std::llround(key_distribution(gen))); } while (group_key >= num_groups);
             gzprintf
             (
                 gz_file, 
                 "%zu,%d\n",
-                static_cast<size_t>(std::clamp(std::llround(key_distribution(gen)), 0LL, static_cast<long long>(num_groups - 1))), 
+                group_key,
                 val_distribution(gen)
             );
             bar.tick();
@@ -158,14 +163,16 @@ int main(int argc, char **argv)
     }
     else if (distribution == "exponential")
     {
-        std::exponential_distribution<> key_distribution(num_groups / 5.0);
+        std::exponential_distribution<> key_distribution(1.0 / (0.3 * num_groups)); 
         for (size_t i = 0; i < num_rows - num_groups; ++i)
         {
+            size_t key;
+            do { key = static_cast<size_t>(key_distribution(gen)); } while (key >= num_groups);        
             gzprintf
             (
                 gz_file,
                 "%zu,%d\n",
-                std::min(static_cast<size_t>(key_distribution(gen)), num_groups - 1),
+                key,
                 val_distribution(gen)
             );
             bar.tick();
