@@ -68,7 +68,7 @@ def bench_polars(args):
         df.sql(sql_str)
         t_end = time.time()
         t_elapsed = t_end - t_start
-        print(f">>> run={i}, elapsed_time={t_elapsed*1000:.2f}ms")
+        print(f">>> run={i}, elapsed_time={t_elapsed*1000:.3f}ms")
     
     logger.success("done with trials")
 
@@ -98,7 +98,7 @@ def bench_duckdb(args):
         con.sql(sql_str).execute()
         t_end = time.time()
         t_elapsed = t_end - t_start
-        print(f">>> run={i}, elapsed_time={t_elapsed*1000:.2f}ms")
+        print(f">>> run={i}, elapsed_time={t_elapsed*1000:.3f}ms")
         
     logger.success("done with trials")
 

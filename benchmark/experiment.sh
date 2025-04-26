@@ -21,7 +21,7 @@ algorithms=('sequential' 'two-phase-central-merge') # algorithms we implement
 distributions=('uniform' 'normal' 'exponential')
 size_configs=('1M-1K' '1M-10K')
 possible_np=(1 2 4 8 16 32 64 128)
-max_np=2
+max_np=4
 num_dryruns=3
 num_trials=5
 
