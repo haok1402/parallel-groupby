@@ -1,67 +1,77 @@
 /**
  * @file generate.cpp
- * @brief Generate synthetic dataset for group-by query execution, compressed with gzip.
+ * @brief Generate synthetic dataset with configurable distributions for
+ * benchmarking the performance of group-by query execution.
  * @author Hao Kang <haok@andrew.cmu.edu>, Leon Lu <lianglu@andrew.cmu.edu>
  * @date April 19, 2025
  */
 
 #include <regex>
-#include <random>
-#include <string>
-#include <sstream>
-#include <iomanip>
-#include <iostream>
-#include <filesystem>
 
-#include <zlib.h>
 #include <CLI11.hpp>
-#include <indicators.hpp>
 
+/**
+ * @brief Parse a string representing an integer count with an optional suffix (K, M, B, T).
+ *
+ * Only supports integer prefixes (e.g., "10K", "5M", "2000"). No decimals allowed.
+ * Recognized suffixes:
+ * - K (thousand, 1e3)
+ * - M (million, 1e6)
+ * - B (billion, 1e9)
+ * - T (trillion, 1e12)
+ *
+ * @param s Input string, e.g., "10K", "5M", "2000".
+ * @return Parsed count as a size_t.
+ */
 size_t parse_count(const std::string &s)
 {
-    double num;
+    size_t num = 0;
     char suffix = '\0';
     std::stringstream ss(s);
     ss >> num >> suffix;
 
     switch (toupper(suffix))
     {
-        case 'K': return static_cast<size_t>(num * 1e3);
-        case 'M': return static_cast<size_t>(num * 1e6);
-        case 'B': return static_cast<size_t>(num * 1e9);
-        case 'T': return static_cast<size_t>(num * 1e12);
-        default : return static_cast<size_t>(num);
+        case 'K': return num * static_cast<size_t>(1e3);
+        case 'M': return num * static_cast<size_t>(1e6);
+        case 'B': return num * static_cast<size_t>(1e9);
+        case 'T': return num * static_cast<size_t>(1e12);
+        default : return num;
     }
 }
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
-    // Parse command line arguments
-    CLI::App app{
-        "Generate synthetic dataset with configurable distributions "
-        "for benchmarking the performance of group-by query execution."};
+    /**
+     * Parse command line arguments
+     */
+    CLI::App app
+    {
+        "Generate synthetic dataset with configurable distributions for "
+        "benchmarking the performance of group-by query execution."
+    };
 
     std::string distribution = "uniform";
-    app.add_option("--distribution", distribution, "Distribution: uniform, normal, or exponential")
+    app.add_option("--distribution", distribution, "Distribution type: uniform, normal, or exponential")
         ->check(CLI::IsMember({"uniform", "normal", "exponential"}))
         ->default_val("uniform");
 
     auto valid_count = CLI::Validator(
         [](std::string &input) {
             static const std::regex pattern(R"(^\d+[KMBT]?$)", std::regex::icase);
-            return std::regex_match(input, pattern) ? "" : std::string("Invalid format: must be an integer optionally ending in K, M, B, or T (e.g., 100K, 1M)");
-        }, 
-        "Must be an integer with optional K/M/B/T suffix", 
+            return std::regex_match(input, pattern) ? "" : "Invalid format: must be an integer optionally ending in K, M, B, or T (e.g., 100K, 1M)";
+        },
+        "Integer with optional K/M/B/T suffix",
         "valid_count"
     );
 
     std::string num_rows_str = "1M";
-    app.add_option("--num-rows", num_rows_str, "Number of rows in the table")
-        ->check(valid_count)
-        ->default_val("1M");
+    app.add_option("--num-rows", num_rows_str, "Number of rows (e.g., 1M, 500K)")
+       ->check(valid_count)
+       ->default_val("1M");
 
     std::string num_groups_str = "1K";
-    app.add_option("--num-groups", num_groups_str, "Number of groups in the distribution")
+    app.add_option("--num-groups", num_groups_str, "Number of groups (e.g., 1K, 100)")
         ->check(valid_count)
         ->default_val("1K");
 
@@ -72,113 +82,8 @@ int main(int argc, char **argv)
 
     if (num_groups > num_rows)
     {
-        std::cerr << "Error: --num-groups cannot be greater than --num-rows!" << std::endl;
+        std::cerr << "Error: --num-groups cannot be greater than --num-rows." << std::endl;
         return 1;
     }
 
-    std::filesystem::create_directory("data");
-    std::ostringstream oss;
-    oss << "data/" << distribution << "-" << num_rows_str << "-" << num_groups_str << ".csv.gz";
-    std::string path = oss.str();
-
-    std::cout << std::left;
-    std::cout << std::setw(30) << "Distribution type"         << ": " << distribution     << "\n";
-    std::cout << std::setw(30) << "Total rows to generate"    << ": " << num_rows_str     << "\n";
-    std::cout << std::setw(30) << "Number of distinct groups" << ": " << num_groups_str   << "\n";
-    std::cout << std::setw(30) << "Output file path"          << ": " << path             << "\n";
-
-    // Prepare for the insertion
-    gzFile gz_file = gzopen(path.c_str(), "wb");
-    if (!gz_file)
-    {
-        std::cerr << "Error: Failed to open " << path << " for gzip writing.\n";
-        return 1;
-    }
-
-    // Seed the random number generator.
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_int_distribution<int16_t> val_distribution(0, std::numeric_limits<int16_t>::max());
-
-    // Initialize the progress bar.
-    indicators::ProgressBar bar
-    {
-        indicators::option::BarWidth{50},
-        indicators::option::Start{"["},
-        indicators::option::Fill{"="},
-        indicators::option::Lead{">"},
-        indicators::option::Remainder{" "},
-        indicators::option::End{"]"},
-        indicators::option::MaxProgress{num_rows},
-        indicators::option::ShowElapsedTime{true},
-        indicators::option::ShowRemainingTime{true},
-        indicators::option::PrefixText{"Generating Dataset"},
-    };
-
-    // Write CSV header
-    gzprintf(gz_file, "key,val\n");
-
-    // Ensure each group has at least one row
-    for (size_t i = 0; i < num_groups; ++i)
-    {
-        gzprintf(gz_file, "%zu,%d\n", i, val_distribution(gen));
-        bar.tick();
-    }
-
-    // Remaining rows follow specified distribution
-    if (distribution == "uniform")
-    {
-        std::uniform_int_distribution<size_t> key_distribution(0, num_groups - 1);
-        for (size_t i = 0; i < num_rows - num_groups; ++i)
-        {
-            gzprintf
-            (
-                gz_file,
-                "%zu,%d\n",
-                key_distribution(gen),
-                val_distribution(gen)
-            );
-            bar.tick();
-        }
-    }
-    else if (distribution == "normal")
-    {
-        std::normal_distribution<> key_distribution(
-            static_cast<double>(num_groups) / 2.0,
-            static_cast<double>(num_groups) / 8.0
-        );
-        for (size_t i = 0; i < num_rows - num_groups; ++i)
-        {
-            size_t group_key;
-            do { group_key = static_cast<size_t>(std::llround(key_distribution(gen))); } while (group_key >= num_groups);
-            gzprintf
-            (
-                gz_file, 
-                "%zu,%d\n",
-                group_key,
-                val_distribution(gen)
-            );
-            bar.tick();
-        }
-    }
-    else if (distribution == "exponential")
-    {
-        std::exponential_distribution<> key_distribution(1.0 / (0.3 * num_groups)); 
-        for (size_t i = 0; i < num_rows - num_groups; ++i)
-        {
-            size_t key;
-            do { key = static_cast<size_t>(key_distribution(gen)); } while (key >= num_groups);        
-            gzprintf
-            (
-                gz_file,
-                "%zu,%d\n",
-                key,
-                val_distribution(gen)
-            );
-            bar.tick();
-        }
-    }
-
-    gzclose(gz_file);
-    return 0;
 }

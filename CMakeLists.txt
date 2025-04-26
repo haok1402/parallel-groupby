@@ -28,13 +28,10 @@ add_executable(two-phase-central-merge src/two-phase-central-merge.cpp)
 add_executable(lock-free-hash-table src/lock-free-hash-table.cpp)
 add_executable(radix-partition-then-merge src/radix-partition-then-merge.cpp)
 
-
-
-# Find ZLIB
-find_package(ZLIB REQUIRED)
-
 # Platform-specific setup
 if(APPLE)
+    find_package(ZLIB REQUIRED)
+
     # DuckDB
     include_directories(/opt/homebrew/Cellar/duckdb/1.2.2/include)
     set(DUCKDB_LIB /opt/homebrew/Cellar/duckdb/1.2.2/lib/libduckdb.dylib)
@@ -70,30 +67,26 @@ if(APPLE)
     )
 
 else()
+
+    find_package(ZLIB REQUIRED)
     find_package(OpenMP REQUIRED)
 
-    # Link dependencies for each target
     target_link_libraries(generate 
         PRIVATE ZLIB::ZLIB
+        PRIVATE OpenMP::OpenMP_CXX
     )
-
     target_link_libraries(two-phase-central-merge 
         PRIVATE ZLIB::ZLIB
         PRIVATE OpenMP::OpenMP_CXX
     )
-
     target_link_libraries(lock-free-hash-table
         PRIVATE ZLIB::ZLIB
     )
-
     target_link_libraries(radix-partition-then-merge
         PRIVATE ZLIB::ZLIB
         PRIVATE OpenMP::OpenMP_CXX
     )
 
-
 endif()
 
-
-# Export compile commands (for tools like clangd)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
