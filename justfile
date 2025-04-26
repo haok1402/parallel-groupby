@@ -52,7 +52,8 @@ build-cpp-release:
 run-cpp: build-cpp
     # ./main --num_threads 1
     # ./main --num_threads 8 --strategy SIMPLE_TWO_PHASE_RADIX
-    ./main --num_threads 4 --algorithm single-thread --dataset_file_path data/exponential/100K-1K.csv.gz --num_dryruns 1 --num_trials 1
+    # ./main --num_threads 4 --algorithm single-thread --dataset_file_path data/exponential/100K-1K.csv.gz --num_dryruns 1 --num_trials 1
+    ./main --num_threads 1 --algorithm two-phase-central-merge --dataset_file_path data/exponential/20-10.csv.gz --num_dryruns 1 --num_trials 1 --validation_file_path data/exponential/val-20-10.csv
 
 tmp-run-cpp-bench strat="SIMPLE_THREE_PHASE_RADIX" max_core="8" cardinality_reduction="-1": build-cpp
     #!/bin/bash

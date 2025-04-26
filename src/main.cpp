@@ -80,7 +80,7 @@ int main(int argc, char *argv[]) {
     
     if (config.algorithm == "sequential") {
         selected_alg = sequential_sol;
-    } else if (config.algorithm == "two-phase-centralized-merge") {
+    } else if (config.algorithm == "two-phase-central-merge") {
         selected_alg = two_phase_centralised_merge_sol;
     // } else if (config.algorithm == "global-lock") {
     //     selected_alg = dumb_global_lock_sol;

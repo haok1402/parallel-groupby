@@ -100,6 +100,19 @@ public:
         agg_map[group_key] = agg_acc;
     }
     
+    inline void merge_from(const SimpleHashAggMap &other_agg_map) {
+        for (const auto& [group_key, other_agg_acc] : other_agg_map) {
+            AggMapValue agg_acc = entry_or_default(group_key);
+            
+            agg_acc[0] = agg_acc[0] + other_agg_acc[0]; // count
+            agg_acc[1] = agg_acc[1] + other_agg_acc[1]; // sum
+            agg_acc[2] = std::min(agg_acc[2], other_agg_acc[2]); // min
+            agg_acc[3] = std::max(agg_acc[3], other_agg_acc[3]); // max
+            
+            agg_map[group_key] = agg_acc;
+        }
+    }
+    
     // iterator wrapper implementation referenced https://stackoverflow.com/questions/20681150/should-i-write-iterators-for-a-class-that-is-just-a-wrapper-of-a-vector
     typedef typename std::unordered_map<int64_t, AggMapValue>::iterator iterator;
     typedef typename std::unordered_map<int64_t, AggMapValue>::const_iterator const_iterator;
@@ -109,6 +122,21 @@ public:
     iterator end() { return agg_map.end(); }
     const_iterator end() const { return agg_map.end(); }
     const_iterator cend() const { return agg_map.cend(); }
+    
+    iterator find(int64_t key) {
+        return agg_map.find(key);
+    }
+    
+    void display() {
+        std::cout << "Map Data:" << std::endl;
+        for (const auto& entry : agg_map) {
+            std::cout << "\t" << entry.first << " |-> ";
+            for (int i = 0; i < 4; i++) {
+                std::cout << entry.second[i] << " ";
+            }
+            std::cout << std::endl;
+        }
+    }
 };
 
 // experiment config, including input file, what to group, what to aggregate, etc.
