@@ -83,8 +83,13 @@ generate dist="exponential" nrows="100K" ngroups="1K": build-cpp
     # create validation data
     duckdb -c "COPY (select * from (select key, count(val) as 'count', sum(val) as 'sum', min(val) as 'min', max(val) as 'max' from 'data/{{dist}}/{{nrows}}-{{ngroups}}.csv.gz' group by key order by key) using sample 100 rows (reservoir, 42)) to 'data/{{dist}}/val-{{nrows}}-{{ngroups}}.csv'"
 
-run-experiment:
-    bash benchmark/experiment.sh
+run-experiment exp_id machine_id max_np:
+    echo -e "================================"
+    echo -e "exp_id: {{exp_id}}"
+    echo -e "machine_id: {{machine_id}}"
+    echo -e "max_np: {{max_np}}"
+    echo -e "================================"
+    bash benchmark/experiment.sh {{exp_id}} {{machine_id}} {{max_np}}
     python benchmark/extract.py -eid dev0
     python analysis/exp-plot-all.py -eid dev0
     

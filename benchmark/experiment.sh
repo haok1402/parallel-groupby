@@ -5,8 +5,8 @@
 # 3. run this script from root of repository, with 2>&1 | tee <logfile>
 
 ts=$(date "+%Y-%m-%d %H:%M:%S")
-exp_identifier="dev0"
-machine_identifier="m1"
+exp_identifier=$1 # e.g. "dev0"
+machine_identifier=$2
 echo "Timestamp: $ts"
 echo "Script: experiment.sh"
 echo "Comment: testing experiment runner script"
@@ -21,7 +21,7 @@ algorithms=('sequential' 'two-phase-central-merge' 'global-lock' 'duckdbish-two-
 distributions=('uniform' 'normal' 'exponential')
 size_configs=('1M-1K' '1M-10K')
 possible_np=(1 2 4 8 16 32 64 128)
-max_np=4
+max_np=$3
 num_dryruns=3
 num_trials=5
 
