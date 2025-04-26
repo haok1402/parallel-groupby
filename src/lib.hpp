@@ -137,6 +137,10 @@ public:
             std::cout << std::endl;
         }
     }
+    
+    size_t size() {
+        return agg_map.size();
+    }
 };
 
 // experiment config, including input file, what to group, what to aggregate, etc.
