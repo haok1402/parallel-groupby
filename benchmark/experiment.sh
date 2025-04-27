@@ -26,7 +26,8 @@ oob_engines=() # out of the box engines to benchmark
 
 # algorithms=('two-phase-central-merge-xxhash')
 # algorithms=('two-phase-radix-xxhash' 'lock-free-hash-table' 'two-phase-central-merge' 'duckdbish-two-phase' 'implicit-repartitioning' 'three-phase-radix' 'two-phase-radix')
-algorithms=('two-phase-central-merge-xxhash' 'two-phase-radix-xxhash' 'duckdbish-two-phase' 'lock-free-hash-table' 'implicit-repartitioning') # algorithms we implement
+# algorithms=('two-phase-central-merge-xxhash' 'two-phase-radix-xxhash' 'duckdbish-two-phase' 'lock-free-hash-table' 'implicit-repartitioning') # algorithms we implement
+algorithms=('omp-lock-free-hash-table' 'two-phase-tree-merge')
 
 distributions=('uniform' 'biuniform' 'exponential' 'normal')
 
