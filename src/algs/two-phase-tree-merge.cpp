@@ -53,7 +53,7 @@ void two_phase_tree_merge_sol(ExpConfig &config, RowStore &table, int trial_idx,
         
         
         
-        // PHASE 2: thread 0 merges results
+        // PHASE 2: merges results
         for (int merge_step = 2; merge_step <= actual_num_threads; merge_step *= 2) {
             if (tid % merge_step == 0) {
                 int other_tid = tid + (merge_step / 2);
