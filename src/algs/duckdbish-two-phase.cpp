@@ -26,11 +26,11 @@ void duckdbish_two_phase_sol(ExpConfig &config, RowStore &table, int trial_idx, 
     int n_partitions = config.num_threads * config.radix_partition_cnt_ratio;
     
     // radix_partitions being a size n_thread array of n_thread array of local agg maps
-    std::vector<std::vector<SimpleHashAggMap>> radix_partitions_local_maps(n_partitions, std::vector<SimpleHashAggMap>(config.num_threads));
+    std::vector<std::vector<XXHashAggMap>> radix_partitions_local_maps(n_partitions, std::vector<XXHashAggMap>(config.num_threads));
     // radix_partitions[2][3] is thread 3's result for partition 2
-    auto local_agg_maps = std::vector<SimpleHashAggMap>(config.num_threads);
+    auto local_agg_maps = std::vector<XXHashAggMap>(config.num_threads);
     assert(local_agg_maps.size() == config.num_threads);
-    SimpleHashAggMap agg_map; // where merged results go if we don't end up partitioning
+    XXHashAggMap agg_map; // where merged results go if we don't end up partitioning
 
     std::cout << "n_partitions = " << n_partitions << std::endl;
     std::cout << "done initialising all the partitions" << std::endl;
@@ -48,7 +48,7 @@ void duckdbish_two_phase_sol(ExpConfig &config, RowStore &table, int trial_idx, 
         
         // === PHASE 1: local aggregation map === 
         
-        SimpleHashAggMap local_agg_map;
+        XXHashAggMap local_agg_map;
         
         if (tid == 0) { t_phase1_0 = std::chrono::steady_clock::now(); }
         
