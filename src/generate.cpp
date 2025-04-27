@@ -81,8 +81,8 @@ int main(int argc, char** argv)
     };
 
     std::string distribution = "uniform";
-    app.add_option("--distribution", distribution, "Distribution type: uniform, normal, or exponential")
-        ->check(CLI::IsMember({"uniform", "normal", "exponential"}))
+    app.add_option("--distribution", distribution, "Distribution type: uniform, normal, biuniform, or exponential")
+        ->check(CLI::IsMember({"uniform", "normal", "exponential", "biuniform"}))
         ->default_val("uniform");
 
     auto valid_count = CLI::Validator(
@@ -268,6 +268,47 @@ int main(int argc, char** argv)
             {
                 size_t key;
                 do { key = static_cast<size_t>(key_distribution(gen)); } while (key >= num_groups);
+                int16_t val = val_distribution(gen);
+                oss << key << "," << val << "\n";
+                if (++cache_size >= batch_size) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
+            }
+            if (cache_size > 0) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
+        }
+    }
+    else if (distribution == "biuniform")
+    {
+        #pragma omp parallel
+        {
+            std::mt19937 gen(SEED + omp_get_thread_num());
+            std::uniform_int_distribution<> key_distribution1(0, num_groups - 1);
+            std::uniform_int_distribution<> key_distribution2(0, 100); // the small number of keys that get sampled very often
+            std::uniform_int_distribution<> coin_flip(0, 1); // decide which dist to draw from
+            std::uniform_int_distribution<int16_t> val_distribution(0, std::numeric_limits<int16_t>::max());
+            std::ostringstream oss;
+            size_t cache_size = 0;
+
+            // Ensure each group has at least one row
+            #pragma omp for
+            for (size_t i = 0; i < num_groups; i++)
+            {
+                size_t key = i;
+                int16_t val = val_distribution(gen);
+                oss << key << "," << val << "\n";
+                if (++cache_size >= batch_size) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
+            }
+            if (cache_size > 0) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
+
+            // Remaining rows follow specified distribution
+            #pragma omp for
+            for (size_t i = 0; i < num_rows - num_groups; ++i)
+            {
+                int64_t coin = coin_flip(gen);
+                int64_t key;
+                if (coin == 1) {
+                    key = key_distribution1(gen);
+                } else {
+                    key = key_distribution2(gen);
+                }
                 int16_t val = val_distribution(gen);
                 oss << key << "," << val << "\n";
                 if (++cache_size >= batch_size) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
