@@ -8,6 +8,8 @@
 /.vscode/sftp.json
 /.vscode/settings.json
 
+/profiling
+
 .vscode
 queries
 report
