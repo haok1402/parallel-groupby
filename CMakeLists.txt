@@ -18,12 +18,15 @@ endif()
 include_directories(SYSTEM 
     ${CMAKE_SOURCE_DIR}/lib/CLI11/include
     ${CMAKE_SOURCE_DIR}/lib/indicators/include
+    ${CMAKE_SOURCE_DIR}/lib/tsl/include
+    ${CMAKE_SOURCE_DIR}/lib/skarupke/include
+    ${CMAKE_SOURCE_DIR}/lib/Cyan4973/include
 )
 
 # Define executables
 add_executable(generate src/generate.cpp)
 file(GLOB ALL_ALGS "src/algs/*.cpp")
-add_executable(main src/main.cpp src/lib.cpp ${ALL_ALGS})
+add_executable(main src/main.cpp src/lib.cpp ${ALL_ALGS} lib/Cyan4973/include/xxhash.c)
 
 # Platform-specific setup
 if(APPLE)
