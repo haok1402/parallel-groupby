@@ -6,6 +6,9 @@
 #include <iostream>
 #include <omp.h>
 #include <string>
+// #include <robin_map.h>
+#include "flat_hash_map.hpp"
+#include "xxhash.h"
 
 typedef std::chrono::time_point<std::chrono::steady_clock> chrono_time_point;
 typedef std::array<int64_t, 4> AggMapValue; // stores count, sum, min, max
@@ -116,6 +119,86 @@ public:
     // iterator wrapper implementation referenced https://stackoverflow.com/questions/20681150/should-i-write-iterators-for-a-class-that-is-just-a-wrapper-of-a-vector
     typedef typename std::unordered_map<int64_t, AggMapValue>::iterator iterator;
     typedef typename std::unordered_map<int64_t, AggMapValue>::const_iterator const_iterator;
+    iterator begin() { return agg_map.begin(); }
+    const_iterator begin() const { return agg_map.begin(); }
+    const_iterator cbegin() const { return agg_map.cbegin(); }
+    iterator end() { return agg_map.end(); }
+    const_iterator end() const { return agg_map.end(); }
+    const_iterator cend() const { return agg_map.cend(); }
+    
+    iterator find(int64_t key) {
+        return agg_map.find(key);
+    }
+    
+    void display() {
+        std::cout << "Map Data:" << std::endl;
+        for (const auto& entry : agg_map) {
+            std::cout << "\t" << entry.first << " |-> ";
+            for (int i = 0; i < 4; i++) {
+                std::cout << entry.second[i] << " ";
+            }
+            std::cout << std::endl;
+        }
+    }
+    
+    size_t size() {
+        return agg_map.size();
+    }
+};
+
+struct I64Hasher {
+    size_t operator()(int64_t key) const {
+        return XXH3_64bits(&key, sizeof(key));
+    }
+};
+
+class XXHashAggMap {
+public:
+    ska::flat_hash_map<int64_t, AggMapValue, I64Hasher> agg_map;
+    
+    inline AggMapValue entry_or_default(int64_t group_key) {
+        if (auto search = agg_map.find(group_key); search != agg_map.end()) {
+            return search->second;
+        } else {
+            return AggMapValue{0, 0, INT64_MAX, INT64_MIN };
+        }
+    }
+    
+    inline AggMapValue& operator[](int64_t group_key) {
+        return agg_map[group_key];
+    }
+    
+    inline void accumulate_from_row(RowStore &table, int r) {
+        auto group_key = table.get(r, 0);
+        
+        // find existing entry, if not initialise
+        AggMapValue agg_acc = entry_or_default(group_key);
+
+        // do the aggregation
+        agg_acc[0] = agg_acc[0] + 1; // count
+        agg_acc[1] = agg_acc[1] + table.get(r, 1); // sum
+        agg_acc[2] = std::min(agg_acc[2], table.get(r, 1)); // min
+        agg_acc[3] = std::max(agg_acc[3], table.get(r, 1)); // max
+        
+        agg_map[group_key] = agg_acc;
+    }
+    
+    inline void merge_from(const XXHashAggMap &other_agg_map) {
+        for (const auto& [group_key, other_agg_acc] : other_agg_map) {
+            AggMapValue agg_acc = entry_or_default(group_key);
+            
+            agg_acc[0] = agg_acc[0] + other_agg_acc[0]; // count
+            agg_acc[1] = agg_acc[1] + other_agg_acc[1]; // sum
+            agg_acc[2] = std::min(agg_acc[2], other_agg_acc[2]); // min
+            agg_acc[3] = std::max(agg_acc[3], other_agg_acc[3]); // max
+            
+            agg_map[group_key] = agg_acc;
+        }
+    }
+    
+    // iterator wrapper implementation referenced https://stackoverflow.com/questions/20681150/should-i-write-iterators-for-a-class-that-is-just-a-wrapper-of-a-vector
+    typedef typename ska::flat_hash_map<int64_t, AggMapValue, I64Hasher>::iterator iterator;
+    typedef typename ska::flat_hash_map<int64_t, AggMapValue, I64Hasher>::const_iterator const_iterator;
     iterator begin() { return agg_map.begin(); }
     const_iterator begin() const { return agg_map.begin(); }
     const_iterator cbegin() const { return agg_map.cbegin(); }

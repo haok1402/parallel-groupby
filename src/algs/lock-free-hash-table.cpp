@@ -11,8 +11,6 @@
 #include <vector>
 #include <optional>
 
-#include <zlib.h>
-#include <CLI11.hpp>
 #include "../lib.hpp"
 
 struct AggEntry

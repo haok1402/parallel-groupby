@@ -24,7 +24,17 @@ download-cpp-libs:
     wget -O lib/CLI11/include/CLI11.hpp https://github.com/CLIUtils/CLI11/releases/download/v2.5.0/CLI11.hpp
     mkdir -p lib/indicators/include
     wget -O lib/indicators/include/indicators.hpp https://raw.githubusercontent.com/p-ranav/indicators/refs/heads/master/single_include/indicators/indicators.hpp
-
+    mkdir -p lib/tsl/include
+    wget -O lib/tsl/include/robin_growth_policy.hpp https://raw.githubusercontent.com/Tessil/robin-map/refs/heads/master/include/tsl/robin_growth_policy.h
+    wget -O lib/tsl/include/robin_hash.hpp https://raw.githubusercontent.com/Tessil/robin-map/refs/heads/master/include/tsl/robin_hash.h
+    wget -O lib/tsl/include/robin_map.hpp https://raw.githubusercontent.com/Tessil/robin-map/refs/heads/master/include/tsl/robin_map.h
+    wget -O lib/tsl/include/robin_set.hpp https://raw.githubusercontent.com/Tessil/robin-map/refs/heads/master/include/tsl/robin_set.h
+    mkdir -p lib/skarupke/include
+    wget -O lib/skarupke/include/flat_hash_map.hpp https://raw.githubusercontent.com/skarupke/flat_hash_map/refs/heads/master/flat_hash_map.hpp
+    mkdir -p lib/Cyan4973/include
+    wget -O lib/Cyan4973/include/xxhash.h https://raw.githubusercontent.com/Cyan4973/xxHash/refs/heads/dev/xxhash.h
+    wget -O lib/Cyan4973/include/xxhash.c https://raw.githubusercontent.com/Cyan4973/xxHash/refs/heads/dev/xxhash.c
+    
 clean:
     make clean
     rm CMakeCache.txt
@@ -46,7 +56,7 @@ build-cpp:
     make
 
 build-cpp-release:
-    cmake -DCMAKE_OSX_SYSROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX15.4.sdk -DCMAKE_BUILD_TYPE=Release .
+    cmake -DCMAKE_BUILD_TYPE=Release .
     make
 
 run-cpp: build-cpp

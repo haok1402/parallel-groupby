@@ -1,2 +1,2 @@
 CompileFlags:
-  Add: [-std=c++17, -I/opt/homebrew/Cellar/open-mpi/5.0.7/include, -I/opt/homebrew/Cellar/duckdb/1.2.2/include, -I/opt/homebrew/opt/libomp/include, -I./lib/cli11/include, -I../lib/cli11/include]
+  Add: [-std=c++17, -I/opt/homebrew/Cellar/open-mpi/5.0.7/include, -I/opt/homebrew/Cellar/duckdb/1.2.2/include, -I/opt/homebrew/opt/libomp/include, -I./lib/cli11/include, -I../lib/cli11/include, -I./lib/tsl/include, -I../lib/tsl/include, -I./lib/skarupke/include, -I../lib/skarupke/include, -I./lib/Cyan4973/include, -I../lib/Cyan4973/include]
