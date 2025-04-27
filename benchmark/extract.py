@@ -50,6 +50,24 @@ def parse_one_log(args, log_filepath: str):
                 'attribute': attribute_name,
                 'value': attribute_value
             })
+            
+            # patch: consider implicit-repartition agg phase as phase_1
+            if algorithm == 'implicit-repartitioning' and attribute_name == 'aggregation_time':
+                entries.append({
+                    'exp_id': args.experiment_id,
+                    'machine_id': machine_id,
+                    'dist': dist,
+                    'size_config': size_config,
+                    'n_rows': n_rows,
+                    'n_groups': n_groups,
+                    'algorithm': algorithm,
+                    'np': np,
+                    'trial_id': trial_id,
+                    'attribute': 'phase_1',
+                    'value': attribute_value
+                })
+
+            
     df = pl.DataFrame(entries)
     return df
 
