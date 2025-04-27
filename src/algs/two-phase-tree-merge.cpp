@@ -1,7 +1,7 @@
 #include "../lib.hpp"
 
 // phase 1: each thread does local aggregation
-// phase 2: one thread merge them all
+// phase 2: threads go merge
 void two_phase_tree_merge_sol(ExpConfig &config, RowStore &table, int trial_idx, bool do_print_stats, std::vector<AggResRow> &agg_res) {
     omp_set_num_threads(config.num_threads);
     
@@ -48,24 +48,25 @@ void two_phase_tree_merge_sol(ExpConfig &config, RowStore &table, int trial_idx,
         if (tid == 0) {
             t_phase1_1 = std::chrono::steady_clock::now();
             time_print("phase_1", trial_idx, t_phase1_0, t_phase1_1, do_print_stats);
+            t_phase2_0 = std::chrono::steady_clock::now();
         }
         
         
-
+        
         // PHASE 2: thread 0 merges results
-        if (tid == 0) {
-            t_phase2_0 = std::chrono::steady_clock::now();
-            
-            agg_map = std::move(local_agg_maps[0]);
-            
-            for (int other_tid = 1; other_tid < actual_num_threads; other_tid++) {
-                agg_map.merge_from(local_agg_maps[other_tid]);
+        for (int merge_step = 2; merge_step <= actual_num_threads; merge_step *= 2) {
+            if (tid % merge_step == 0) {
+                int other_tid = tid + (merge_step / 2);
+                if (other_tid < actual_num_threads) {
+                    local_agg_maps[tid].merge_from(local_agg_maps[other_tid]);
+                }
             }
-            
-            t_phase2_1 = std::chrono::steady_clock::now();
-            time_print("phase_2", trial_idx, t_phase2_0, t_phase2_1, do_print_stats);
+            #pragma omp barrier
         }
     }
+    
+    t_phase2_1 = std::chrono::steady_clock::now();
+    time_print("phase_2", trial_idx, t_phase2_0, t_phase2_1, do_print_stats);
     
     t_agg_1 = std::chrono::steady_clock::now();
     time_print("aggregation_time", trial_idx, t_agg_0, t_agg_1, do_print_stats);
