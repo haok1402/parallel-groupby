@@ -1,12 +1,17 @@
 #!/bin/bash
     
-# 1. just build-cpp
+# 1. just clean && just build-cpp-release
 # 2. make sure datasets have been generated
 # 3. run this script from root of repository, with 2>&1 | tee <logfile>
+# or sbatch -p RM -N 1 -t 6:00:00 benchmark/experiment.sh psc-baselines-2 psc 128
+
+module load anaconda3/2024.10-1
+conda activate default
+just build-cpp-release
 
 ts=$(date "+%Y-%m-%d %H:%M:%S")
 exp_identifier=$1 # e.g. "dev0"
-machine_identifier=$2
+machine_identifier=$2 # e.g. "psc"
 echo "Timestamp: $ts"
 echo "Script: experiment.sh"
 echo "Comment: testing experiment runner script"
@@ -16,11 +21,19 @@ echo "machine Identifier: $machine_identifier"
 log_dir="logs/$exp_identifier/$machine_identifier"
 echo "We'll write outputs to $log_dir/"
 
-oob_engines=('duckdb' 'polars') # out of the box engines to benchmark
-algorithms=('two-phase-central-merge' 'two-phase-central-merge-xxhash' 'global-lock' 'duckdbish-two-phase' 'implicit-repartitioning' 'three-phase-radix' 'two-phase-radix' 'two-phase-radix-xxhash' 'lock-free-hash-table') # algorithms we implement
-distributions=('uniform' 'normal' 'exponential')
-size_configs=('8M-20K' '8M-200K' '8M-2M' '80M-20K' '80M-200K' '80M-2M' '80M-20M')
-#  '800M-20K' '800M-200K' '800M-2M' '800M-20M' '800M-200M'
+oob_engines=() # out of the box engines to benchmark
+# oob_engines=('duckdb' 'polars') # out of the box engines to benchmark
+
+# algorithms=('two-phase-central-merge-xxhash')
+# algorithms=('two-phase-radix-xxhash' 'lock-free-hash-table' 'two-phase-central-merge' 'duckdbish-two-phase' 'implicit-repartitioning' 'three-phase-radix' 'two-phase-radix')
+algorithms=('two-phase-central-merge-xxhash' 'two-phase-radix-xxhash' 'duckdbish-two-phase' 'lock-free-hash-table' 'implicit-repartitioning') # algorithms we implement
+
+distributions=('uniform' 'biuniform' 'exponential' 'normal')
+
+# size_configs=('8M-2M')
+size_configs=('8M-2K' '8M-20K' '8M-200K' '8M-2M'    '80M-20K' '80M-200K' '80M-2M' '80M-20M')
+# '8M-2K' '8M-20K' '8M-200K' '8M-2M'   '80M-20K' '80M-200K' '80M-2M' '80M-20M'    '800M-200K' '800M-2M' '800M-20M' '800M-200M'
+
 possible_np=(1 2 4 8 16 32 64 128)
 max_np=$3
 num_dryruns=3
