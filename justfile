@@ -57,7 +57,7 @@ build-cpp:
 
 build-cpp-release:
     cmake -DCMAKE_BUILD_TYPE=Release .
-    make
+    make -j $(nproc)
 
 run-cpp: build-cpp
     # ./main --num_threads 1
