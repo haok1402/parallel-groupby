@@ -50,8 +50,10 @@ class AggMap
                 {
                     data[j].cnt.fetch_add(1, std::memory_order_relaxed);
                     data[j].sum.fetch_add(v, std::memory_order_relaxed);
-                    data[j].min.store(v, std::memory_order_relaxed);
-                    data[j].max.store(v, std::memory_order_relaxed);
+                    int64_t cur_min = data[j].min.load(std::memory_order_relaxed);
+                    while (v < cur_min && !data[j].min.compare_exchange_weak(cur_min, v, std::memory_order_relaxed));
+                    int64_t cur_max = data[j].max.load(std::memory_order_relaxed);
+                    while (v > cur_max && !data[j].max.compare_exchange_weak(cur_max, v, std::memory_order_relaxed));
                     return true;
                 }
                 if (expected == k)
@@ -91,21 +93,13 @@ void omp_lock_free_hash_table_sol(ExpConfig &config, RowStore &table, int trial_
 
     int num_threads = config.num_threads;
 
-    std::vector<std::thread> threads;
-
-    for (int t = 0; t < num_threads; ++t)
+    #pragma omp parallel num_threads(num_threads)
     {
-        threads.emplace_back([&, t]() {
-            for (size_t r = t; r < n_rows; r += num_threads)
-            {
-                map.upsert(table.get(r, 0), table.get(r, 1));
-            }
-        });
-    }
-
-    for (auto& th : threads)
-    {
-        th.join();
+        #pragma omp for schedule(static)
+        for (size_t r = 0; r < n_rows; r++)
+        {
+            map.upsert(table.get(r, 0), table.get(r, 1));
+        }
     }
 
     t_aggregate_1 = std::chrono::steady_clock::now();
