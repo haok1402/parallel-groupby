@@ -279,9 +279,10 @@ int main(int argc, char** argv)
     {
         #pragma omp parallel
         {
+            const int n_dist2_groups = 100;
             std::mt19937 gen(SEED + omp_get_thread_num());
             std::uniform_int_distribution<> key_distribution1(0, num_groups - 1);
-            std::uniform_int_distribution<> key_distribution2(0, 100); // the small number of keys that get sampled very often
+            std::uniform_int_distribution<> key_distribution2(0, n_dist2_groups); // the small number of keys that get sampled very often
             std::uniform_int_distribution<> coin_flip(0, 1); // decide which dist to draw from
             std::uniform_int_distribution<int16_t> val_distribution(0, std::numeric_limits<int16_t>::max());
             std::ostringstream oss;
@@ -307,7 +308,7 @@ int main(int argc, char** argv)
                 if (coin == 1) {
                     key = key_distribution1(gen);
                 } else {
-                    key = key_distribution2(gen);
+                    key = key_distribution2(gen) * num_groups / n_dist2_groups;
                 }
                 int16_t val = val_distribution(gen);
                 oss << key << "," << val << "\n";
