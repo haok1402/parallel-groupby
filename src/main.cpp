@@ -97,7 +97,7 @@ int main(int argc, char *argv[]) {
     } else if (config.algorithm == "three-phase-radix") {
         selected_alg = three_phase_radix_sol;
     } else if (config.algorithm == "lock-free-hash-table") {
-        selected_alg = lock_free_hash_table_sol;
+        selected_alg = omp_lock_free_hash_table_sol;
     } else {
         throw std::runtime_error("Unsupported algorithm");
     }
