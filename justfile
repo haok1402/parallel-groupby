@@ -50,9 +50,14 @@ linux-setup-duckdb:
     mkdir -p lib/duckdb/lib
     mv libduckdb.so libduckdb_static.a lib/duckdb/lib/
 
-build-cpp:
+build-cpp-quick:
     # cmake -DCMAKE_OSX_SYSROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX15.4.sdk .
     cmake .
+    make
+
+build-cpp:
+    # cmake -DCMAKE_OSX_SYSROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX15.4.sdk .
+    cmake -DCMAKE_BUILD_TYPE=Release .
     make
 
 build-cpp-release:
@@ -69,17 +74,16 @@ example-bench-cmds:
     python benchmark/bench.py -np 2 -i data/exponential/1M-1K.csv.gz -e duckdb -q --num_dryruns 3 --num_trials 5
     ./main --num_threads 2 --algorithm two-phase-central-merge --dataset_file_path data/exponential/1M-1K.csv.gz --num_dryruns 1 --num_trials 1 --validation_file_path data/exponential/val-1M-1K.csv
 
-tmp-run-cpp-bench strat="SIMPLE_THREE_PHASE_RADIX" max_core="8" cardinality_reduction="-1": build-cpp
+bench-cpp dist="uniform" alg="lock-free-hash-table" max_core="8": build-cpp
     #!/bin/bash
     max_core={{max_core}}
-    strat={{strat}}
-    cardinality_reduction={{cardinality_reduction}}
+    alg={{alg}}
     echo -e "================================"
-    echo -e "strategy: $strat"
+    echo -e "algorithm: $alg"
+    echo -e "distribution: $dist"
     echo -e "max_core: $max_core"
-    echo -e "cardinality_reduction: $cardinality_reduction"
     echo -e "================================"
-    config_args="--strategy {{strat}} --in_db_file_path data/tpch-sf1.db --cardinality_reduction $cardinality_reduction --num_dryruns 1 --num_trials 3"
+    config_args="--algorithm {{alg}} --dataset_file_path data/{{dist}}/8M-200K.csv.gz --num_dryruns 0 --num_trials 1 --validation_file_path data/{{dist}}/val-8M-200K.csv"
     for np in 1 2 4 8 16 32 64 128; do
         if [[ $np -gt $max_core ]]; then
             continue
@@ -93,52 +97,28 @@ generate dist="exponential" nrows="100K" ngroups="1K": build-cpp
     # create validation data
     duckdb -c "COPY (select * from (select key, count(val) as 'count', sum(val) as 'sum', min(val) as 'min', max(val) as 'max' from 'data/{{dist}}/{{nrows}}-{{ngroups}}.csv.gz' group by key order by key) using sample 100 rows (reservoir, 42)) to 'data/{{dist}}/val-{{nrows}}-{{ngroups}}.csv'"
 
-generate-all:
-    just generate uniform 8M 20K
-    just generate uniform 8M 200K
-    just generate uniform 8M 2M
-    
-    just generate uniform 80M 20K
-    just generate uniform 80M 200K
-    just generate uniform 80M 2M
-    just generate uniform 80M 20M
-    
-    just generate uniform 800M 20K
-    just generate uniform 800M 200K
-    just generate uniform 800M 2M
-    just generate uniform 800M 20M
-    just generate uniform 800M 200M
+generate-all: 
+    just generate-dist normal
+    just generate-dist exponential
+    just generate-dist biuniform
+    just generate-dist uniform
 
-    just generate normal 8M 20K
-    just generate normal 8M 200K
-    just generate normal 8M 2M
+generate-dist distribution="normal": 
+    # just generate {{distribution}} 8M 2K
+    # just generate {{distribution}} 8M 20K
+    # just generate {{distribution}} 8M 200K
+    # just generate {{distribution}} 8M 2M
     
-    just generate normal 80M 20K
-    just generate normal 80M 200K
-    just generate normal 80M 2M
-    just generate normal 80M 20M
+    # just generate {{distribution}} 80M 20K
+    # just generate {{distribution}} 80M 200K
+    just generate {{distribution}} 80M 2M
+    # just generate {{distribution}} 80M 20M
     
-    just generate normal 800M 20K
-    just generate normal 800M 200K
-    just generate normal 800M 2M
-    just generate normal 800M 20M
-    just generate normal 800M 200M
-
-    just generate exponential 8M 20K
-    just generate exponential 8M 200K
-    just generate exponential 8M 2M
+    # just generate uniform 800M 200K
+    # just generate uniform 800M 2M
+    # just generate uniform 800M 20M
+    # just generate uniform 800M 200M
     
-    just generate exponential 80M 20K
-    just generate exponential 80M 200K
-    just generate exponential 80M 2M
-    just generate exponential 80M 20M
-    
-    just generate exponential 800M 20K
-    just generate exponential 800M 200K
-    just generate exponential 800M 2M
-    just generate exponential 800M 20M
-    just generate exponential 800M 200M
-
 run-experiment exp_id machine_id max_np:
     echo -e "================================"
     echo -e "exp_id: {{exp_id}}"
