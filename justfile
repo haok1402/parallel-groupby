@@ -98,7 +98,37 @@ generate-all:
     just generate uniform 800M 2M
     just generate uniform 800M 20M
     just generate uniform 800M 200M
+
+    just generate normal 8M 20K
+    just generate normal 8M 200K
+    just generate normal 8M 2M
     
+    just generate normal 80M 20K
+    just generate normal 80M 200K
+    just generate normal 80M 2M
+    just generate normal 80M 20M
+    
+    just generate normal 800M 20K
+    just generate normal 800M 200K
+    just generate normal 800M 2M
+    just generate normal 800M 20M
+    just generate normal 800M 200M
+
+    just generate exponential 8M 20K
+    just generate exponential 8M 200K
+    just generate exponential 8M 2M
+    
+    just generate exponential 80M 20K
+    just generate exponential 80M 200K
+    just generate exponential 80M 2M
+    just generate exponential 80M 20M
+    
+    just generate exponential 800M 20K
+    just generate exponential 800M 200K
+    just generate exponential 800M 2M
+    just generate exponential 800M 20M
+    just generate exponential 800M 200M
+
 run-experiment exp_id machine_id max_np:
     echo -e "================================"
     echo -e "exp_id: {{exp_id}}"
