@@ -24,7 +24,7 @@ rinspect(args,  title="args")
 exp_id = args.experiment_id
 result_filepath = f"results/{exp_id}.parquet"
 
-
+ALG_ORD = ['two-phase-central-merge', 'two-phase-central-merge-xxhash', 'two-phase-radix', 'two-phase-radix-xxhash', 'three-phase-radix', 'duckdbish-two-phase', 'implicit-repartitioning', 'lock-free-hash-table', 'polars', 'duckdb']
 
 # 1 > read data
 
@@ -36,6 +36,7 @@ def value_mapper(s: str):
         return float(s.replace("ms", ""))
     else:
         assert False
+
 results_df = results_df.with_columns(
     time=pl.col("value").map_elements(value_mapper, return_dtype=pl.Float64)
 )
@@ -50,8 +51,13 @@ with pl.Config(tbl_cols=999):
 
 results_df = results_df.sql("""--sql
     select exp_id, machine_id, dist, size_config, n_rows, n_groups, algorithm, np, attribute, avg(time) as avg_time from self
+    where true
+      --and n_rows = 8000000
+      and algorithm != 'sequential'
+      --and dist = 'uniform'
+      --and (dist = 'uniform' or dist = 'biuniform')
     group by exp_id, machine_id, dist, size_config, n_rows, n_groups, algorithm, np, attribute
-    order by exp_id, machine_id, dist, size_config, n_rows, n_groups, algorithm, attribute, np
+    order by exp_id, machine_id, dist, n_rows, n_groups, algorithm, attribute, np
 """)
 with pl.Config(tbl_cols=999):
     print("results_df")
@@ -82,12 +88,12 @@ with pl.Config(tbl_cols=999):
 
 g = sns.FacetGrid(plot_df, col="size_config", row='dist', height=3, aspect=1.5)
 g.map_dataframe(sns.lineplot,     
+    hue='algorithm',  hue_order=ALG_ORD,
     x='np',
     y='latency',
-    hue='algorithm',
     style='machine_id',
 )
-g.set(xlim=(1, None), ylim=(0, None))
+g.set(xlim=(1, None), ylim=(0, None), yscale="log")
 g.add_legend()
 g.figure.suptitle("Elapsed Time vs Num Threads", y=1.03)
 g.figure.savefig(f"results/{exp_id}-latency.pdf")
@@ -111,18 +117,19 @@ plot_df = pl.SQLContext(results_df=results_df, single_thread_df=single_thread_df
 with pl.Config(tbl_cols=999):
     print(plot_df)
 
-g = sns.FacetGrid(plot_df, col="size_config", row='dist', height=3, aspect=1.5)
-g.map_dataframe(sns.lineplot,     
-    x='np',
-    y='speedup',
-    hue='algorithm',
-    style='machine_id',
-)
-g.set(xlim=(1, None), ylim=(0, max_np))
-g.add_legend()
-g.figure.suptitle("Speedup vs Num Threads", y=1.03)
-g.figure.savefig(f"results/{exp_id}-oob-speedup.pdf")
-logger.success(f"saved results/{exp_id}-oob-speedup.pdf")
+if len(plot_df) > 0:
+    g = sns.FacetGrid(plot_df, col="size_config", row='dist', height=3, aspect=1.5)
+    g.map_dataframe(sns.lineplot,     
+        hue='algorithm',  hue_order=ALG_ORD,
+        x='np',
+        y='speedup',
+        style='machine_id',
+    )
+    g.set(xlim=(1, None), ylim=(0, max_np))
+    g.add_legend()
+    g.figure.suptitle("Speedup vs Num Threads", y=1.03)
+    g.figure.savefig(f"results/{exp_id}-oob-speedup.pdf")
+    logger.success(f"saved results/{exp_id}-oob-speedup.pdf")
 
 # 5 > aggregation speedup plot
 
@@ -145,9 +152,9 @@ with pl.Config(tbl_cols=999):
 
 g = sns.FacetGrid(plot_df, col="size_config", row='dist', height=3, aspect=1.5)
 g.map_dataframe(sns.lineplot,     
+    hue='algorithm',  hue_order=ALG_ORD,
     x='np',
     y='speedup',
-    hue='algorithm',
     style='machine_id',
 )
 g.set(xlim=(1, None), ylim=(0, max_np))
@@ -168,13 +175,13 @@ with pl.Config(tbl_cols=999):
 
 g = sns.FacetGrid(plot_df, col="size_config", row='dist', height=3, aspect=1.5)
 g.map_dataframe(sns.lineplot,     
+    hue='algorithm',  hue_order=ALG_ORD,
     x='np',
     y='latency',
-    hue='algorithm',
     size='machine_id',
     style='phase',
 )
-g.set(xlim=(1, None), ylim=(0, None))
+g.set(xlim=(1, None), ylim=(0, None), yscale="log")
 g.add_legend()
 g.figure.suptitle("Elapsed Time vs Num Threads", y=1.03)
 g.figure.savefig(f"results/{exp_id}-phase-latency.pdf")
