@@ -16,3 +16,7 @@ vtune -collect hotspots -result-dir profiling/three-phase-radix-8M2M -- ./main -
 vtune -collect hotspots -result-dir profiling/lock-free-hash-table-8M20K -- ./main --algorithm lock-free-hash-table --num_threads 16 --dataset_file_path data/uniform/8M-20K.csv.gz --validation_file_path data/uniform/val-8M-20K.csv
 vtune -collect hotspots -result-dir profiling/lock-free-hash-table-8M200K -- ./main --algorithm lock-free-hash-table --num_threads 16 --dataset_file_path data/uniform/8M-200K.csv.gz --validation_file_path data/uniform/val-8M-200K.csv
 vtune -collect hotspots -result-dir profiling/lock-free-hash-table-8M2M -- ./main --algorithm lock-free-hash-table --num_threads 16 --dataset_file_path data/uniform/8M-2M.csv.gz --validation_file_path data/uniform/val-8M-2M.csv
+
+vtune -collect hotspots -result-dir profiling/implicit-repartitioning-8M20K -- ./main --algorithm implicit-repartitioning --num_threads 16 --dataset_file_path data/uniform/8M-20K.csv.gz --validation_file_path data/uniform/val-8M-20K.csv
+vtune -collect hotspots -result-dir profiling/implicit-repartitioning-8M200K -- ./main --algorithm implicit-repartitioning --num_threads 16 --dataset_file_path data/uniform/8M-200K.csv.gz --validation_file_path data/uniform/val-8M-200K.csv
+vtune -collect hotspots -result-dir profiling/implicit-repartitioning-8M2M -- ./main --algorithm implicit-repartitioning --num_threads 16 --dataset_file_path data/uniform/8M-2M.csv.gz --validation_file_path data/uniform/val-8M-2M.csv
