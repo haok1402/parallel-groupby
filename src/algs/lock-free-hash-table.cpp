@@ -50,8 +50,10 @@ class AggMap
                 {
                     data[j].cnt.fetch_add(1, std::memory_order_relaxed);
                     data[j].sum.fetch_add(v, std::memory_order_relaxed);
-                    data[j].min.store(v, std::memory_order_relaxed);
-                    data[j].max.store(v, std::memory_order_relaxed);
+                    int64_t cur_min = data[j].min.load(std::memory_order_relaxed);
+                    while (v < cur_min && !data[j].min.compare_exchange_weak(cur_min, v, std::memory_order_relaxed));
+                    int64_t cur_max = data[j].max.load(std::memory_order_relaxed);
+                    while (v > cur_max && !data[j].max.compare_exchange_weak(cur_max, v, std::memory_order_relaxed));
                     return true;
                 }
                 if (expected == k)
