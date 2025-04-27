@@ -58,7 +58,7 @@ build-cpp-quick:
 build-cpp:
     # cmake -DCMAKE_OSX_SYSROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX15.4.sdk .
     cmake -DCMAKE_BUILD_TYPE=Release .
-    make
+    make -j $(nproc)
 
 build-cpp-release:
     cmake -DCMAKE_BUILD_TYPE=Release .
@@ -83,7 +83,7 @@ bench-cpp dist="uniform" alg="lock-free-hash-table" max_core="8": build-cpp
     echo -e "distribution: $dist"
     echo -e "max_core: $max_core"
     echo -e "================================"
-    config_args="--algorithm {{alg}} --dataset_file_path data/{{dist}}/8M-200K.csv.gz --num_dryruns 0 --num_trials 1 --validation_file_path data/{{dist}}/val-8M-200K.csv"
+    config_args="--algorithm {{alg}} --dataset_file_path data/{{dist}}/8M-2M.csv.gz --num_dryruns 0 --num_trials 1 --validation_file_path data/{{dist}}/val-8M-2M.csv"
     for np in 1 2 4 8 16 32 64 128; do
         if [[ $np -gt $max_core ]]; then
             continue

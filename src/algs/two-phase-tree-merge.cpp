@@ -23,9 +23,9 @@ void two_phase_tree_merge_sol(ExpConfig &config, RowStore &table, int trial_idx,
     
     t_agg_0 = std::chrono::steady_clock::now();
 
-    auto local_agg_maps = std::vector<SimpleHashAggMap>(config.num_threads);
+    auto local_agg_maps = std::vector<XXHashAggMap>(config.num_threads);
     assert(local_agg_maps.size() == config.num_threads);
-    SimpleHashAggMap agg_map; // where merged results go
+    XXHashAggMap agg_map; // where merged results go
     
     #pragma omp parallel
     {
@@ -34,7 +34,7 @@ void two_phase_tree_merge_sol(ExpConfig &config, RowStore &table, int trial_idx,
         assert(actual_num_threads == config.num_threads);
         
         // PHASE 1: local aggregation map
-        SimpleHashAggMap local_agg_map;
+        XXHashAggMap local_agg_map;
         
         if (tid == 0) { t_phase1_0 = std::chrono::steady_clock::now(); }
         
@@ -63,10 +63,13 @@ void two_phase_tree_merge_sol(ExpConfig &config, RowStore &table, int trial_idx,
             }
             #pragma omp barrier
         }
+        
+        if (tid == 0) {
+            t_phase2_1 = std::chrono::steady_clock::now();
+            time_print("phase_2", trial_idx, t_phase2_0, t_phase2_1, do_print_stats);
+        }
     }
     
-    t_phase2_1 = std::chrono::steady_clock::now();
-    time_print("phase_2", trial_idx, t_phase2_0, t_phase2_1, do_print_stats);
     
     t_agg_1 = std::chrono::steady_clock::now();
     time_print("aggregation_time", trial_idx, t_agg_0, t_agg_1, do_print_stats);

@@ -102,6 +102,8 @@ int main(int argc, char *argv[]) {
         selected_alg = omp_lock_free_hash_table_sol;
     } else if (config.algorithm == "lock-free-hash-table") {
         selected_alg = lock_free_hash_table_sol;
+    } else if (config.algorithm == "adaptive-alg1") {
+        selected_alg = adaptive_alg1_sol;
     } else {
         throw std::runtime_error("Unsupported algorithm");
     }

@@ -2,6 +2,7 @@
 
 //! Shared library for all other things
 
+#include <cstdint>
 #include <duckdb.hpp>
 #include <iostream>
 #include <omp.h>
@@ -269,3 +270,76 @@ void load_data(ExpConfig &config, RowStore &table);
 
 void time_print(std::string title, int run_id, chrono_time_point start, chrono_time_point end, bool do_print_stats);
 std::unordered_map<int64_t, AggMapValue> load_valiadtion_data(ExpConfig &config);
+
+struct AggEntry
+{
+    std::atomic<int64_t> key;
+    std::atomic<int64_t> cnt;
+    std::atomic<int64_t> sum;
+    std::atomic<int64_t> min;
+    std::atomic<int64_t> max;
+    AggEntry() : key(INT64_MIN), cnt(0), sum(0), min(INT64_MAX), max(INT64_MIN) {}
+};
+
+struct AggEntrySnapshot
+{
+    int64_t key;
+    int64_t cnt;
+    int64_t sum;
+    int64_t min;
+    int64_t max;
+};
+
+class AggMap
+{
+    public:
+        explicit AggMap(size_t n)
+            : size(n), data(n) {}
+
+        inline bool upsert(int64_t k, int64_t v)
+        {
+            size_t i = std::hash<int64_t>{} (k);
+            for (size_t probe = 0; probe < size; probe++)
+            {
+                size_t j = (i + probe) % size;
+                int64_t expected = INT64_MIN;
+
+                if (data[j].key.compare_exchange_strong(expected, k, std::memory_order_acq_rel, std::memory_order_acquire) || expected == k)
+                {
+                    data[j].cnt.fetch_add(1, std::memory_order_relaxed);
+                    data[j].sum.fetch_add(v, std::memory_order_relaxed);
+                    int64_t cur_min = data[j].min.load(std::memory_order_relaxed);
+                    while (v < cur_min && !data[j].min.compare_exchange_weak(cur_min, v, std::memory_order_relaxed));
+                    int64_t cur_max = data[j].max.load(std::memory_order_relaxed);
+                    while (v > cur_max && !data[j].max.compare_exchange_weak(cur_max, v, std::memory_order_relaxed));
+                    return true;
+                }
+            }
+            return false;
+        }
+        
+        inline bool accumulate_from_accval(int64_t k, AggMapValue val) {
+            size_t i = std::hash<int64_t>{} (k);
+            for (size_t probe = 0; probe < size; probe++)
+            {
+                size_t j = (i + probe) % size;
+                int64_t expected = INT64_MIN;
+
+                if (data[j].key.compare_exchange_strong(expected, k, std::memory_order_acq_rel, std::memory_order_acquire) || expected == k)
+                {
+                    data[j].cnt.fetch_add(val[0], std::memory_order_relaxed);
+                    data[j].sum.fetch_add(val[1], std::memory_order_relaxed);
+                    int64_t cur_min = data[j].min.load(std::memory_order_relaxed);
+                    while (val[2] < cur_min && !data[j].min.compare_exchange_weak(cur_min, val[2], std::memory_order_relaxed));
+                    int64_t cur_max = data[j].max.load(std::memory_order_relaxed);
+                    while (val[3] > cur_max && !data[j].max.compare_exchange_weak(cur_max, val[3], std::memory_order_relaxed));
+                    return true;
+                }
+            }
+            return false;
+        }
+
+    public:
+        size_t size;
+        std::vector<AggEntry> data;
+};

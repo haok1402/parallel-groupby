@@ -184,6 +184,17 @@ int main(int argc, char** argv)
             std::ostringstream oss;
             size_t cache_size = 0;
 
+            // Remaining rows follow specified distribution
+            #pragma omp for
+            for (size_t i = 0; i < num_rows - num_groups; ++i)
+            {
+                int64_t key = key_distribution(gen);
+                int16_t val = val_distribution(gen);
+                oss << key << "," << val << "\n";
+                if (++cache_size >= batch_size) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
+            }
+            if (cache_size > 0) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
+
             // Ensure each group has at least one row
             #pragma omp for
             for (size_t i = 0; i < num_groups; i++)
@@ -195,16 +206,6 @@ int main(int argc, char** argv)
             }
             if (cache_size > 0) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
 
-            // Remaining rows follow specified distribution
-            #pragma omp for
-            for (size_t i = 0; i < num_rows - num_groups; ++i)
-            {
-                int64_t key = key_distribution(gen);
-                int16_t val = val_distribution(gen);
-                oss << key << "," << val << "\n";
-                if (++cache_size >= batch_size) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
-            }
-            if (cache_size > 0) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
         }
     }
     else if (distribution == "normal")
@@ -217,23 +218,23 @@ int main(int argc, char** argv)
             std::ostringstream oss;
             size_t cache_size = 0;
 
-            // Ensure each group has at least one row
-            #pragma omp for
-            for (size_t i = 0; i < num_groups; i++)
-            {
-                int64_t key = i;
-                int16_t val = val_distribution(gen);
-                oss << key << "," << val << "\n";
-                if (++cache_size >= batch_size) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
-            }
-            if (cache_size > 0) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
-
             // Remaining rows follow specified distribution
             #pragma omp for
             for (size_t i = 0; i < num_rows - num_groups; ++i)
             {
                 size_t key;
                 do { key = static_cast<size_t>(std::llround(key_distribution(gen))); } while (key >= num_groups); 
+                int16_t val = val_distribution(gen);
+                oss << key << "," << val << "\n";
+                if (++cache_size >= batch_size) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
+            }
+            if (cache_size > 0) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
+            
+            // Ensure each group has at least one row
+            #pragma omp for
+            for (size_t i = 0; i < num_groups; i++)
+            {
+                int64_t key = i;
                 int16_t val = val_distribution(gen);
                 oss << key << "," << val << "\n";
                 if (++cache_size >= batch_size) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
@@ -251,17 +252,6 @@ int main(int argc, char** argv)
             std::ostringstream oss;
             size_t cache_size = 0;
 
-            // Ensure each group has at least one row
-            #pragma omp for
-            for (size_t i = 0; i < num_groups; i++)
-            {
-                size_t key = i;
-                int16_t val = val_distribution(gen);
-                oss << key << "," << val << "\n";
-                if (++cache_size >= batch_size) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
-            }
-            if (cache_size > 0) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
-
             // Remaining rows follow specified distribution
             #pragma omp for
             for (size_t i = 0; i < num_rows - num_groups; ++i)
@@ -273,6 +263,18 @@ int main(int argc, char** argv)
                 if (++cache_size >= batch_size) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
             }
             if (cache_size > 0) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
+            
+            // Ensure each group has at least one row
+            #pragma omp for
+            for (size_t i = 0; i < num_groups; i++)
+            {
+                size_t key = i;
+                int16_t val = val_distribution(gen);
+                oss << key << "," << val << "\n";
+                if (++cache_size >= batch_size) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
+            }
+            if (cache_size > 0) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
+
         }
     }
     else if (distribution == "biuniform")
@@ -287,17 +289,6 @@ int main(int argc, char** argv)
             std::uniform_int_distribution<int16_t> val_distribution(0, std::numeric_limits<int16_t>::max());
             std::ostringstream oss;
             size_t cache_size = 0;
-
-            // Ensure each group has at least one row
-            #pragma omp for
-            for (size_t i = 0; i < num_groups; i++)
-            {
-                size_t key = i;
-                int16_t val = val_distribution(gen);
-                oss << key << "," << val << "\n";
-                if (++cache_size >= batch_size) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
-            }
-            if (cache_size > 0) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
 
             // Remaining rows follow specified distribution
             #pragma omp for
@@ -315,6 +306,18 @@ int main(int argc, char** argv)
                 if (++cache_size >= batch_size) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
             }
             if (cache_size > 0) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
+            
+            // Ensure each group has at least one row
+            #pragma omp for
+            for (size_t i = 0; i < num_groups; i++)
+            {
+                size_t key = i;
+                int16_t val = val_distribution(gen);
+                oss << key << "," << val << "\n";
+                if (++cache_size >= batch_size) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
+            }
+            if (cache_size > 0) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
+
         }
     }
 

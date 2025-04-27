@@ -13,68 +13,6 @@
 
 #include "../lib.hpp"
 
-struct AggEntry
-{
-    std::atomic<int64_t> key;
-    std::atomic<int64_t> cnt;
-    std::atomic<int64_t> sum;
-    std::atomic<int64_t> min;
-    std::atomic<int64_t> max;
-    AggEntry() : key(INT64_MIN), cnt(0), sum(0), min(INT64_MAX), max(INT64_MIN) {}
-};
-
-struct AggEntrySnapshot
-{
-    int64_t key;
-    int64_t cnt;
-    int64_t sum;
-    int64_t min;
-    int64_t max;
-};
-
-class AggMap
-{
-    public:
-        explicit AggMap(size_t n)
-            : size(n), data(n) {}
-
-        bool upsert(int64_t k, int64_t v)
-        {
-            size_t i = std::hash<int64_t>{} (k);
-            for (size_t probe = 0; probe < size; probe++)
-            {
-                size_t j = (i + probe) % size;
-                int64_t expected = INT64_MIN;
-
-                if (data[j].key.compare_exchange_strong(expected, k, std::memory_order_acq_rel, std::memory_order_acquire))
-                {
-                    data[j].cnt.fetch_add(1, std::memory_order_relaxed);
-                    data[j].sum.fetch_add(v, std::memory_order_relaxed);
-                    int64_t cur_min = data[j].min.load(std::memory_order_relaxed);
-                    while (v < cur_min && !data[j].min.compare_exchange_weak(cur_min, v, std::memory_order_relaxed));
-                    int64_t cur_max = data[j].max.load(std::memory_order_relaxed);
-                    while (v > cur_max && !data[j].max.compare_exchange_weak(cur_max, v, std::memory_order_relaxed));
-                    return true;
-                }
-                if (expected == k)
-                {
-                    data[j].cnt.fetch_add(1, std::memory_order_relaxed);
-                    data[j].sum.fetch_add(v, std::memory_order_relaxed);
-                    int64_t cur_min = data[j].min.load(std::memory_order_relaxed);
-                    while (v < cur_min && !data[j].min.compare_exchange_weak(cur_min, v, std::memory_order_relaxed));
-                    int64_t cur_max = data[j].max.load(std::memory_order_relaxed);
-                    while (v > cur_max && !data[j].max.compare_exchange_weak(cur_max, v, std::memory_order_relaxed));
-                    return true;
-                }
-            }
-            return false;
-        }
-
-    public:
-        size_t size;
-        std::vector<AggEntry> data;
-};
-
 void omp_lock_free_hash_table_sol(ExpConfig &config, RowStore &table, int trial_idx, bool do_print_stats, std::vector<AggResRow> &agg_res)
 {
     chrono_time_point t_overall_0;
