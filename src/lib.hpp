@@ -6,11 +6,10 @@
 #include <iostream>
 #include <omp.h>
 #include <string>
-// #include <robin_map.h>
-#include "flat_hash_map.hpp"
+#include <flat_hash_map.hpp>
 #include "xxhash.h"
 
-typedef std::chrono::time_point<std::chrono::steady_clock> chrono_time_point;
+typedef std::chrono::time_point<std::chrono::steady_clock, std::chrono::steady_clock::duration> chrono_time_point;
 typedef std::array<int64_t, 4> AggMapValue; // stores count, sum, min, max
 typedef std::array<int64_t, 4+1> AggResRow; 
 
