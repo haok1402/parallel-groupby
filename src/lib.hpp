@@ -224,6 +224,10 @@ public:
     size_t size() {
         return agg_map.size();
     }
+    
+    void reserve(size_t n) {
+        agg_map.reserve(n);
+    }
 };
 
 // experiment config, including input file, what to group, what to aggregate, etc.
@@ -343,3 +347,15 @@ class AggMap
         size_t size;
         std::vector<AggEntry> data;
 };
+
+
+
+
+inline float expected_g(float k, float G);
+float estimate_G(float k, float g_tilde);
+
+// float central_merge_cost_model(float G, int S_int, int p_int);
+// float tree_merge_cost_model(float G, int S_int, int p_int);
+// float radix_merge_cost_model(float G, int S_int, int p_int);
+// float noradix_scan_cost_model(float G, int S_int, int p_int);
+// float radix_scan_cost_model(float G, int S_int, int p_int, int num_partitions);

@@ -1,4 +1,5 @@
 #include "../lib.hpp"
+#include "_all_algs.hpp"
 
 const int sample_prefix_len = 1000;
 
@@ -9,43 +10,8 @@ enum class StratEnum {
     LOCKFREE,
 };
 
-// compute expected number of unique group keys seen if there are G total keys and we take k samples
-inline float expected_g(float k, float G) {
-    return G * (
-        1.0f -
-        std::pow((G - 1.0f) / G, k)
-    );
-}
 
-// estimate the total number of keys G given a sample size k and seeing g_tilde
-float estimate_G(float k, float g_tilde) {
-    // to avoid numerical issue, clamp g_tilde to k - 1
-    g_tilde = std::min(g_tilde, k - 1.0f);
-    
-    float lo = g_tilde;
-    float hi = lo;
-    
-    // find an upper bound
-    while (expected_g(k, hi) < g_tilde) {
-        hi *= 2.0f;
-    }
-
-    const float epsilon = 1.0;
-    
-    // now we're sure target is between lo and hi
-    while (std::abs(hi - lo) > epsilon) {
-        float mid = (lo + hi) / 2.0f;
-        if (expected_g(k, mid) < g_tilde) {
-            lo = mid;
-        } else {
-            hi = mid;
-        }
-    }
-    return lo;
-}
-
-
-
+// phase 0: do sampling and decide on strategy
 // phase 1: each thread does local aggregation
 // phase 2: threads go merge
 void adaptive_alg1_sol(ExpConfig &config, RowStore &table, int trial_idx, bool do_print_stats, std::vector<AggResRow> &agg_res) {
@@ -84,33 +50,34 @@ void adaptive_alg1_sol(ExpConfig &config, RowStore &table, int trial_idx, bool d
     // float group_to_row_ratio = static_cast<float>(sample_phase_agg_map.size()) / static_cast<float>(n_sampled_row);
     float g_tilde = static_cast<float>(sample_phase_agg_map.size());
     float G_hat = estimate_G(static_cast<float>(n_sampled_row), g_tilde);
+    int G_hat_int = static_cast<int>(G_hat);
     StratEnum strat_decision;
     
     // do decision tree
     
-    std::cout << "sample_phase_agg_map.size() = " << sample_phase_agg_map.size() << std::endl;
+    std::cout << "g_tilde = " << g_tilde << std::endl;
     std::cout << "G_hat = " << G_hat << std::endl;
     std::cout << "config.num_threads = " << config.num_threads << std::endl;
     
-    if (G_hat < 10000) {
+    if (G_hat < 50000) {
         if (config.num_threads <= 4) {
             // use centralized merge
-            std::cout << "decided to use centralized merge" << std::endl;
+            std::cout << ">> strat-decided=centralized-merge" << std::endl;
             strat_decision = StratEnum::CENTRAL;
         } else {
             // use tree merge
-            std::cout << "decided to use tree merge" << std::endl;
+            std::cout << ">> strat-decided=tree-merge" << std::endl;
             strat_decision = StratEnum::TREE;
         }
     } else {
-        if (config.num_threads >= 16) {
-            // use two phase radix
-            std::cout << "decided to use two phase radix" << std::endl;
-            strat_decision = StratEnum::RADIX;
-        } else {
+        if (config.num_threads < 16 && (100 * g_tilde < 95 * sample_prefix_len)) { // to be safe, we can only be confident about potential htable size if the prefix isn't saturated by new keys
             // use lock free
-            std::cout << "decided to use lock free" << std::endl;
+            std::cout << ">> strat-decided=lock-free" << std::endl;
             strat_decision = StratEnum::LOCKFREE;
+        } else {
+            // use two phase radix
+            std::cout << ">> strat-decided=two-phase-radix" << std::endl;
+            strat_decision = StratEnum::RADIX;
         }
     }
     
@@ -126,6 +93,7 @@ void adaptive_alg1_sol(ExpConfig &config, RowStore &table, int trial_idx, bool d
         auto local_agg_maps = std::vector<XXHashAggMap>(config.num_threads);
         assert(local_agg_maps.size() == config.num_threads);
         XXHashAggMap agg_map; // where merged results go
+        agg_map.reserve(G_hat_int);
         
         #pragma omp parallel
         {
@@ -135,6 +103,7 @@ void adaptive_alg1_sol(ExpConfig &config, RowStore &table, int trial_idx, bool d
             
             // PHASE 1: local aggregation map
             XXHashAggMap local_agg_map;
+            local_agg_map.reserve(G_hat_int);
             
             if (tid == 0) { t_phase1_0 = std::chrono::steady_clock::now(); }
             
@@ -185,7 +154,8 @@ void adaptive_alg1_sol(ExpConfig &config, RowStore &table, int trial_idx, bool d
         // data structure if we were to do local hmap based things
         auto local_agg_maps = std::vector<XXHashAggMap>(config.num_threads);
         assert(local_agg_maps.size() == config.num_threads);
-        XXHashAggMap agg_map; // where merged results go
+        XXHashAggMap agg_map; // where merged results go        
+        agg_map.reserve(G_hat_int);
         
         #pragma omp parallel
         {
@@ -195,6 +165,7 @@ void adaptive_alg1_sol(ExpConfig &config, RowStore &table, int trial_idx, bool d
             
             // PHASE 1: local aggregation map
             XXHashAggMap local_agg_map;
+            local_agg_map.reserve(G_hat_int);
             
             if (tid == 0) { t_phase1_0 = std::chrono::steady_clock::now(); }
             
@@ -257,6 +228,10 @@ void adaptive_alg1_sol(ExpConfig &config, RowStore &table, int trial_idx, bool d
             // === PHASE 1: aggregate into partition and local aggregation map === 
             
             std::vector<XXHashAggMap> local_radix_partitions(n_partitions);
+            for (size_t i = 0; i < n_partitions; i++) {
+                local_radix_partitions[i] = XXHashAggMap();
+                local_radix_partitions[i].reserve(G_hat_int);
+            }
             
             if (tid == 0) { t_phase1_0 = std::chrono::steady_clock::now(); }
             
@@ -323,15 +298,26 @@ void adaptive_alg1_sol(ExpConfig &config, RowStore &table, int trial_idx, bool d
     } else if (strat_decision == StratEnum::LOCKFREE) {
 
         t_agg_0 = std::chrono::steady_clock::now();
-        AggMap map(n_rows);
+        AggMap map(static_cast<size_t>(G_hat) * 4);
 
+        bool htable_overflow = false;
+        
         #pragma omp parallel num_threads(config.num_threads)
         {
             #pragma omp for schedule(static)
             for (size_t r = sample_prefix_len; r < n_rows; r++)
             {
-                map.upsert(table.get(r, 0), table.get(r, 1));
+                bool succeeded = map.upsert(table.get(r, 0), table.get(r, 1));
+                if (!succeeded) {
+                    htable_overflow = true;
+                }
             }
+        }
+
+        if (htable_overflow) {
+            std::cout << "un oh... blew up lock free htable... don't know what to do... fall back to two-phase-radix\n" << std::endl;
+            two_phase_radix_xxhash_sol(config, table, trial_idx, do_print_stats, agg_res);
+            return;
         }
 
         for (auto& [key, val] : sample_phase_agg_map) {
