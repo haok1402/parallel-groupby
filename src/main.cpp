@@ -75,6 +75,7 @@ int main(int argc, char *argv[]) {
     
     RowStore table;
     load_data(config, table);
+    std::cout << "loaded data into memory" << std::endl;
     std::vector<AggResRow> agg_res; // where to write results to
     
     std::function<void(ExpConfig &config, RowStore &table, int trial_idx, bool do_print_stats, std::vector<AggResRow> &agg_res)> selected_alg;
