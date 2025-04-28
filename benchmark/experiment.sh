@@ -5,9 +5,12 @@
 # 3. run this script from root of repository, with 2>&1 | tee <logfile>
 # or sbatch -p RM -N 1 -t 6:00:00 benchmark/experiment.sh psc-baselines-2 psc 128
 
+# module load anaconda3/2024.10-1
+# conda activate default
+# just build-cpp-release
+
 module load anaconda3/2024.10-1
-conda activate default
-just build-cpp-release
+conda activate code
 
 ts=$(date "+%Y-%m-%d %H:%M:%S")
 exp_identifier=$1 # e.g. "dev0"
@@ -21,14 +24,15 @@ echo "machine Identifier: $machine_identifier"
 log_dir="logs/$exp_identifier/$machine_identifier"
 echo "We'll write outputs to $log_dir/"
 
-oob_engines=() # out of the box engines to benchmark
-# oob_engines=('duckdb' 'polars') # out of the box engines to benchmark
+# oob_engines=() # out of the box engines to benchmark
+oob_engines=('duckdb' 'polars') # out of the box engines to benchmark
 
+algorithms=()
 # algorithms=('two-phase-central-merge-xxhash')
 # algorithms=('two-phase-radix-xxhash' 'lock-free-hash-table' 'two-phase-central-merge' 'duckdbish-two-phase' 'implicit-repartitioning' 'three-phase-radix' 'two-phase-radix')
 # algorithms=('two-phase-central-merge-xxhash' 'two-phase-radix-xxhash' 'duckdbish-two-phase' 'lock-free-hash-table' 'implicit-repartitioning') # algorithms we implement
 # algorithms=('omp-lock-free-hash-table' 'two-phase-tree-merge')
-algorithms=('adaptive-alg1' 'adaptive-alg2' 'omp-lock-free-hash-table' 'two-phase-tree-merge' 'two-phase-radix-xxhash' 'two-phase-central-merge-xxhash')
+# algorithms=('adaptive-alg1' 'adaptive-alg2' 'omp-lock-free-hash-table' 'two-phase-tree-merge' 'two-phase-radix-xxhash' 'two-phase-central-merge-xxhash')
 
 distributions=('uniform')
 
