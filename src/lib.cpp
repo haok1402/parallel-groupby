@@ -1,4 +1,5 @@
 #include "lib.hpp"
+#include <cmath>
 #include <duckdb.hpp>
 #include <iostream>
 #include <omp.h>
@@ -58,3 +59,92 @@ void time_print(std::string title, int run_id, chrono_time_point start, chrono_t
         std::cout << ">>> run=" << run_id << ", " << title << "=" << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms" << std::endl;
     }
 }
+
+
+
+// cost estimation stuff
+
+// compute expected number of unique group keys seen if there are G total keys and we take k samples
+inline float expected_g(float k, float G) {
+    return G * (
+        1.0f -
+        std::pow((G - 1.0f) / G, k)
+    );
+}
+
+// estimate the total number of keys G given a sample size k and seeing g_tilde
+float estimate_G(float k, float g_tilde) {
+    // to avoid numerical issue, clamp g_tilde to k - 1
+    g_tilde = std::min(g_tilde, k - 1.0f);
+    
+    float lo = g_tilde;
+    float hi = lo;
+    
+    // find an upper bound
+    while (expected_g(k, hi) < g_tilde) {
+        hi *= 2.0f;
+    }
+
+    const float epsilon = 1.0;
+    
+    // now we're sure target is between lo and hi
+    while (std::abs(hi - lo) > epsilon) {
+        float mid = (lo + hi) / 2.0f;
+        if (expected_g(k, mid) < g_tilde) {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    return lo;
+}
+
+// below... require knowing S...
+
+// // estimate central merge cost if there are G keys, we have seen S rows, and we have p processors
+// float central_merge_cost_model(float G, int S_int, int p_int) {
+//     float groups_per_thread = static_cast<float>(S_int);
+//     float p = static_cast<float>(p_int);
+//     return 
+//         (p - 1.0f) * 
+//         G * 
+//         (1.0f - std::pow((1.0f - G) / G, groups_per_thread));
+// }
+
+// // estimate tree merge cost if there are G keys, we have seen S rows, and we have p processors
+// float tree_merge_cost_model(float G, int S_int, int p_int) {
+//     float groups_per_thread = static_cast<float>(S_int);
+//     const float lambda = 1.2f;
+//     float p = static_cast<float>(p_int);
+    
+//     float sum = 0.0f;
+//     for (int l = 0; l < p_int; l *= 2) {
+//         sum += (1.0f - std::pow((1.0f - G) / G, groups_per_thread * (0x1 << l)));
+//     }
+    
+//     return 
+//         lambda
+//         * std::log2(p)
+//         * sum;
+// }
+
+// // estimate radix merge cost if there are G keys, we have seen S rows, and we have p processors
+// float radix_merge_cost_model(float G, int S_int, int p_int) {
+//     float groups_per_thread = static_cast<float>(S_int);
+//     float p = static_cast<float>(p_int);
+//     return 
+//         (p - 1.0f) * 
+//         G * 
+//         (1.0f / p);
+// }
+
+// float noradix_scan_cost_model(float G, int S_int, int p_int) {
+//     float groups_per_thread = static_cast<float>(S_int);
+//     return 1.0f * groups_per_thread + G * log2(G);
+// }
+
+// float radix_scan_cost_model(float G, int S_int, int p_int, int num_partitions) {
+//     float groups_per_thread = static_cast<float>(S_int);
+//     float N = static_cast<float>(num_partitions);
+//     return 2.0f * groups_per_thread + G * log2(G / N);
+// }
