@@ -25,10 +25,15 @@ float tree_merge_cost_model(float G, int S_int, int p_int) {
     float groups_per_thread = static_cast<float>(S_int);
     const float lambda = 1.1f;
     float p = static_cast<float>(p_int);
+    // std::cout << "G = " << G << std::endl;    
+    // std::cout << "S_int = " << S_int << std::endl;
+    // std::cout << "p_int = " << p_int << std::endl;
     
     float sum = 0.0f;
-    for (int l = 0; l < p_int; l += 1) {
-        sum += (1.0f - std::pow((1.0f - G) / G, groups_per_thread * (0x1 << l)));
+    for (int two_to_l = 1; two_to_l < p_int; two_to_l *= 2) {
+        // std::cout << "   two_to_l = " << two_to_l << std::endl;
+        // std::cout << "⛳ sum += (1.0f - std::pow((1.0f - G) / G, groups_per_thread * (0x1 << two_to_l))) = "  <<  (1.0f - std::pow((1.0f - G) / G, groups_per_thread * (0x1 << two_to_l))) << std::endl;
+        sum += (1.0f - std::pow((1.0f - G) / G, groups_per_thread * (0x1 << two_to_l)));
     }
     
     return 
@@ -183,7 +188,7 @@ void adaptive_alg3_sol(ExpConfig &config, RowStore &table, int trial_idx, bool d
         int G_hat_int = static_cast<int>(max_G_hat);
         
         // once we see enough rows, enough groups, and see that G_hat stablizes, we decide to switch to lock free
-        if ((row_ub >= 5000000 && G_hat_int >= 500000 && G_hat <= 1.1 * prev_max_G_hat) || a_hat == StratEnum::LOCKFREE) {
+        if ((row_ub >= 3000000 && G_hat_int >= 300000 && G_hat <= 1.2 * prev_max_G_hat) || a_hat == StratEnum::LOCKFREE) {
             std::cout << ">> adaption-step=" << adaptation_step << ", adapt-to=lock-free" << std::endl;
             a_hat = StratEnum::LOCKFREE;
             p_hat = p;
@@ -217,10 +222,18 @@ void adaptive_alg3_sol(ExpConfig &config, RowStore &table, int trial_idx, bool d
                 float radix_merge_cost = radix_merge_cost_model(max_G_hat, 2 * S, p_hat_candidate);
                 float noradix_scan_cost = noradix_scan_cost_model(max_G_hat, 2 * S, p_hat_candidate);
                 float radix_scan_cost = radix_scan_cost_model(max_G_hat, 2 * S, p_hat_candidate, n_partitions);
+                std::cout << "central_merge_cost " << central_merge_cost << std::endl;
+                std::cout << "tree_merge_cost " << tree_merge_cost << std::endl;
+                std::cout << "radix_merge_cost " << radix_merge_cost << std::endl;
+                std::cout << "noradix_scan_cost " << noradix_scan_cost << std::endl;
+                std::cout << "radix_scan_cost " << radix_scan_cost << std::endl;
                 float two_phase_central_cost = central_merge_cost + noradix_scan_cost;
                 float two_phase_radix_cost = radix_merge_cost + radix_scan_cost;
                 float two_phase_tree_cost = tree_merge_cost + noradix_scan_cost;
                 float min_strat_cost = std::min(two_phase_central_cost, std::min(two_phase_radix_cost, two_phase_tree_cost));
+                std::cout << "two_phase_radix_cost " << two_phase_radix_cost << std::endl;
+                std::cout << "two_phase_tree_cost " << two_phase_tree_cost << std::endl;
+                std::cout << "min_strat_cost " << min_strat_cost << std::endl;
                 if (min_strat_cost < cost_best) {
                     cost_best = min_strat_cost;
                     p_best = p_hat_candidate;
