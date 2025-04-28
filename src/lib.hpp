@@ -147,7 +147,7 @@ public:
 };
 
 struct I64Hasher {
-    size_t operator()(int64_t key) const {
+    inline size_t operator()(int64_t key) const {
         return XXH3_64bits(&key, sizeof(key));
     }
 };
