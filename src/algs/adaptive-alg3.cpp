@@ -1,9 +1,11 @@
 #include "../lib.hpp"
 #include <cmath>
+#include <flat_hash_map.hpp>
+#include "xxhash.h"
 
 // TODO don't use a funny number
-// const int L3Size = 256000000;  // PSC should be this
-const int L3Size = 256000;  // for testing
+const int L3Size = 256000000;  // PSC should be this
+// const int L3Size = 256000;  // for testing
 
 enum class StratEnum {
     RADIX,
@@ -99,7 +101,8 @@ void adaptive_alg3_sol(ExpConfig &config, RowStore &table, int trial_idx, bool d
     // if we were to do radix
     int n_partitions = config.num_threads * config.radix_partition_cnt_ratio;
     std::vector<std::vector<XXHashAggMap>> radix_partitions_local_maps(n_partitions, std::vector<XXHashAggMap>(config.num_threads));    
-
+    auto hasher = I64Hasher{};
+    
     // if we do lock free hash table later... for now, size = 0
     LockFreeAggMap lock_free_map(0);
     
@@ -107,6 +110,12 @@ void adaptive_alg3_sol(ExpConfig &config, RowStore &table, int trial_idx, bool d
     // === interatively process larger and larger number of rows
     int row_lb = 0;
     int row_ub = S;
+
+    // G sampling
+    int g_tilde_sum = 0;
+    int n_sampled_row = 0;
+    float max_G_hat = 1.0f;
+    ska::flat_hash_map<int64_t, int64_t, I64Hasher> g_sample_map;
     
     do {
         std::cout << "adaptation_step = " << adaptation_step << std::endl;
@@ -115,8 +124,6 @@ void adaptive_alg3_sol(ExpConfig &config, RowStore &table, int trial_idx, bool d
         std::cout << "S = " << S << std::endl;
         std::cout << "p_hat = " << p_hat << std::endl;
         
-        int g_tilde_sum = 0;
-        int n_sampled_row = std::min(row_ub, n_rows) - row_lb;
         
         // do scanning using that strategy
         omp_set_num_threads(p_hat);
@@ -143,14 +150,37 @@ void adaptive_alg3_sol(ExpConfig &config, RowStore &table, int trial_idx, bool d
                 } else {
                     throw std::runtime_error("unreachable");
                 }
+                if (tid == 0 && r % (128 / p) < 4) { // sample once in a while
+                    n_sampled_row += 1;
+                    g_sample_map[table.get(r, 0)] = 0;
+                }
             }
             
+            if (tid == 0) {
+                g_tilde_sum = g_sample_map.size();
+            }
+
+            // #pragma omp atomic
+            // g_tilde_sum += local_g_tilde_sum;
+            // #pragma omp atomic
+            // n_sampled_row += local_n_sampled_row;
+        
             // each thread add the num of group keys they saw to g_tilde_sum
         }
         
+        // maybe we're done, in which case exit
+        if (row_ub >= n_rows) {
+            break;
+        }
+        
         // perofrm adaptation
-        // float G_hat = estimate_G(static_cast<float>(n_sampled_row), static_cast<float>(g_tilde_sum));
-        float G_hat = 2000.0f;
+        float G_hat = estimate_G(static_cast<float>(n_sampled_row), static_cast<float>(g_tilde_sum));
+        max_G_hat = std::max(max_G_hat, G_hat);
+        G_hat = max_G_hat;
+        std::cout << "<sampling> n_sampled_row = " << n_sampled_row << std::endl;
+        std::cout << "<sampling> g_tilde_sum = " << g_tilde_sum << std::endl;
+        std::cout << "<sampling> G_hat = " << G_hat << std::endl;
+        // float G_hat = 2000.0f;
         int G_hat_int = static_cast<int>(G_hat);
         
         if ((row_ub >= 10000000 && p * G_hat_int * (5 * 8) >= L3Size && 4 * G_hat_int <= 2 * row_ub) || a_hat == StratEnum::LOCKFREE) {
@@ -309,6 +339,23 @@ void adaptive_alg3_sol(ExpConfig &config, RowStore &table, int trial_idx, bool d
     } else {
         // result lives in local_agg_maps[0]
         std::cout << "result in local_agg_maps[0] with size " << local_agg_maps[0].size() << std::endl; 
+    }
+    
+    if (touched_lock_free) {
+        for (auto& entry : lock_free_map.data) {
+            if (entry.key.load() == INT64_MIN) continue;
+            agg_res.push_back(AggResRow{entry.key.load(), entry.cnt.load(), entry.sum.load(), entry.min.load(), entry.max.load()});
+        }
+    } else if (touched_radix) {
+        for (size_t part_idx = 0; part_idx < n_partitions; part_idx++) {
+            for (auto& [group_key, agg_acc] : radix_partitions_local_maps[part_idx][0]) {
+                agg_res.push_back(AggResRow{group_key, agg_acc[0], agg_acc[1], agg_acc[2], agg_acc[3]});
+            }
+        }
+    } else {
+        for (auto& [group_key, agg_acc] : local_agg_maps[0]) {
+            agg_res.push_back(AggResRow{group_key, agg_acc[0], agg_acc[1], agg_acc[2], agg_acc[3]});
+        }
     }
     
     t_agg_1 = std::chrono::steady_clock::now();

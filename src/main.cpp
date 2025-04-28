@@ -12,6 +12,7 @@
 #include "algs/_all_algs.hpp"
 
 void validate_results(std::vector<AggResRow> agg_res, std::unordered_map<int64_t, AggMapValue> reference_agg_map) {
+    std::cout << "agg_res has size " << agg_res.size() << ", check this manually" << std::endl;
     for (const auto& row : agg_res) {
         // if row in reference_agg_map, check each value equal
         auto group_key = row[0];
