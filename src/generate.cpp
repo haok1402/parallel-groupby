@@ -81,8 +81,8 @@ int main(int argc, char** argv)
     };
 
     std::string distribution = "uniform";
-    app.add_option("--distribution", distribution, "Distribution type: uniform, normal, biuniform, or exponential")
-        ->check(CLI::IsMember({"uniform", "normal", "exponential", "biuniform"}))
+    app.add_option("--distribution", distribution, "Distribution type: uniform, normal, biuniform, exponential, or adversarial")
+        ->check(CLI::IsMember({"uniform", "normal", "exponential", "biuniform", "adversarial"}))
         ->default_val("uniform");
 
     auto valid_count = CLI::Validator(
@@ -318,6 +318,73 @@ int main(int argc, char** argv)
             }
             if (cache_size > 0) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
 
+        }
+    }
+    else if (distribution == "adversarial")
+    {
+        /**
+         *  0M-20M: ENSURED (0-20M)
+         * 20M-40M: UNIFORM (0-200K)
+         * 40M-60M: UNIFORM (0-20K)
+         * 60M-80M: UNIFROM (0-2K)
+         */
+        #pragma omp parallel
+        {
+            std::mt19937 gen(SEED + omp_get_thread_num());
+            std::uniform_int_distribution<int16_t> val_distribution(0, std::numeric_limits<int16_t>::max());
+            std::ostringstream oss;
+            size_t cache_size = 0;
+
+            // 0M-20M: ENSURED (0-20M)
+            std::vector<int64_t> vec(20000000);
+            std::iota(vec.begin(), vec.end(), 1);
+            std::shuffle(vec.begin(), vec.end(), gen);
+
+            #pragma omp for
+            for (size_t i = 0; i < vec.size(); i++)
+            {
+                size_t key = vec[i];
+                int16_t val = val_distribution(gen);
+                oss << key << "," << val << "\n";
+                if (++cache_size >= batch_size) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
+            }
+            if (cache_size > 0) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
+
+            // 20M-40M: UNIFORM (0-200K)
+            std::uniform_int_distribution<int64_t> key_distribution1(0, 200000);
+            #pragma omp for
+            for (size_t i = 0; i < 20000000; ++i)
+            {
+                int64_t key = key_distribution1(gen);
+                int16_t val = val_distribution(gen);
+                oss << key << "," << val << "\n";
+                if (++cache_size >= batch_size) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
+            }
+            if (cache_size > 0) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
+
+            // 40M-60M: UNIFORM (0-20K)
+            std::uniform_int_distribution<int64_t> key_distribution2(0, 20000);
+            #pragma omp for
+            for (size_t i = 0; i < 20000000; ++i)
+            {
+                int64_t key = key_distribution2(gen);
+                int16_t val = val_distribution(gen);
+                oss << key << "," << val << "\n";
+                if (++cache_size >= batch_size) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
+            }
+            if (cache_size > 0) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
+
+            // 60M-80M: UNIFROM (0-2K)
+            std::uniform_int_distribution<int64_t> key_distribution3(0, 2000);
+            #pragma omp for
+            for (size_t i = 0; i < 20000000; ++i)
+            {
+                int64_t key = key_distribution3(gen);
+                int16_t val = val_distribution(gen);
+                oss << key << "," << val << "\n";
+                if (++cache_size >= batch_size) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
+            }
+            if (cache_size > 0) { FLUSH_CACHE(file, oss, bar, p, cache_size); }
         }
     }
 
