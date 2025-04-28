@@ -190,7 +190,7 @@ void adaptive_alg3_sol(ExpConfig &config, RowStore &table, int trial_idx, bool d
             int want_lock_free_map_size = G_hat_int * 4;
             int acceptable_lock_free_map_size = G_hat_int * 3;
             
-            if (lock_free_map.size < acceptable_lock_free_map_size) {
+            if (lock_free_map.size < acceptable_lock_free_map_size && (!touched_lock_free)) {
                 std::cout << "resizing lock free hmap" << std::endl;
                 // resize it to want_lock_free_map_size
                 LockFreeAggMap new_lock_free_map(want_lock_free_map_size);
