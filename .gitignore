@@ -31,3 +31,4 @@ src-rs/target
 logs
 results/*.parquet
 results/*.pdf
+results/*.png
