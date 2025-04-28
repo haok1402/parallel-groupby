@@ -106,8 +106,8 @@ int main(int argc, char *argv[]) {
         selected_alg = adaptive_alg1_sol;
     } else if (config.algorithm == "adaptive-alg2") {
         selected_alg = adaptive_alg2_sol;
-    // } else if (config.algorithm == "adaptive-alg3") {
-    //     selected_alg = adaptive_alg3_sol;
+    } else if (config.algorithm == "adaptive-alg3") {
+        selected_alg = adaptive_alg3_sol;
     // } else if (config.algorithm == "adaptive-alg4") {
     //     selected_alg = adaptive_alg4_sol;
     } else {

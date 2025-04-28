@@ -1,0 +1,323 @@
+#include "../lib.hpp"
+#include <cmath>
+
+const int sample_prefix_len = 1000;
+
+enum class StratEnum {
+    RADIX,
+    TREE,
+    CENTRAL,
+    LOCKFREE,
+};
+
+// estimate central merge cost if there are G keys, we have seen S rows, and we have p processors
+float central_merge_cost_model(float G, int S_int, int p_int) {
+    float groups_per_thread = static_cast<float>(S_int);
+    float p = static_cast<float>(p_int);
+    return 
+        (p - 1.0f) * 
+        G * 
+        (1.0f - std::pow((1.0f - G) / G, groups_per_thread));
+}
+
+// estimate tree merge cost if there are G keys, we have seen S rows, and we have p processors
+float tree_merge_cost_model(float G, int S_int, int p_int) {
+    float groups_per_thread = static_cast<float>(S_int);
+    const float lambda = 1.2f;
+    float p = static_cast<float>(p_int);
+    
+    float sum = 0.0f;
+    for (int l = 0; l < p_int; l *= 2) {
+        sum += (1.0f - std::pow((1.0f - G) / G, groups_per_thread * (0x1 << l)));
+    }
+    
+    return 
+        lambda
+        * std::log2(p)
+        * sum;
+}
+
+// estimate radix merge cost if there are G keys, we have seen S rows, and we have p processors
+float radix_merge_cost_model(float G, int S_int, int p_int) {
+    float groups_per_thread = static_cast<float>(S_int);
+    float p = static_cast<float>(p_int);
+    return 
+        (p - 1.0f) * 
+        G * 
+        (1.0f / p);
+}
+
+float noradix_scan_cost_model(float G, int S_int, int p_int) {
+    float groups_per_thread = static_cast<float>(S_int);
+    return 1.0f * groups_per_thread + G * log2(G);
+}
+
+float radix_scan_cost_model(float G, int S_int, int p_int, int num_partitions) {
+    float groups_per_thread = static_cast<float>(S_int);
+    float N = static_cast<float>(num_partitions);
+    return 2.0f * groups_per_thread + G * log2(G / N);
+}
+
+// const int L3Size = 256000000;  // PSC should be this
+const int L3Size = 256000;  // for testing
+
+// phase 0: do sampling and decide on strategy
+// phase 1: each thread does local aggregation
+// phase 2: threads go merge
+void adaptive_alg3_sol(ExpConfig &config, RowStore &table, int trial_idx, bool do_print_stats, std::vector<AggResRow> &agg_res) {
+
+    auto n_cols = table.n_cols;
+    auto n_rows = table.n_rows;
+
+    chrono_time_point t_overall_0;
+    chrono_time_point t_overall_1;
+    chrono_time_point t_agg_0;
+    chrono_time_point t_agg_1;
+    chrono_time_point t_output_0;
+    chrono_time_point t_output_1;
+    t_overall_0 = std::chrono::steady_clock::now();
+    t_agg_0 = std::chrono::steady_clock::now();
+    
+    int B = config.batch_size;
+    int S = B;
+    int p = config.num_threads;
+    int p_hat = std::min(4, p);
+    int adaptation_step = 0;
+    StratEnum a_hat = StratEnum::CENTRAL;
+    
+    // === init data structures ===
+    bool touched_per_therad_maps = true;
+    int num_per_threads_map_used = p_hat;
+    bool touched_radix = false;
+    bool touched_lock_free = false;
+    
+    // data structure if we were to do local hmap based things
+    auto local_agg_maps = std::vector<XXHashAggMap>(config.num_threads);
+    assert(local_agg_maps.size() == config.num_threads);
+    XXHashAggMap local_agg_maps_merged; // where merged results go
+    
+    // if we were to do radix
+    int n_partitions = config.num_threads * config.radix_partition_cnt_ratio;
+    std::vector<std::vector<XXHashAggMap>> radix_partitions_local_maps(n_partitions, std::vector<XXHashAggMap>(config.num_threads));    
+
+    // if we do lock free hash table later... for now, size = 0
+    LockFreeAggMap lock_free_map(0);
+    
+    
+    // === interatively process larger and larger number of rows
+    int row_lb = 0;
+    int row_ub = S;
+    
+    do {
+        std::cout << "adaptation_step = " << adaptation_step << std::endl;
+        std::cout << "row_lb = " << row_lb << std::endl;
+        std::cout << "row_ub = " << row_ub << std::endl;
+        std::cout << "S = " << S << std::endl;
+        std::cout << "p_hat = " << p_hat << std::endl;
+        
+        int g_tilde_sum = 0;
+        int n_sampled_row = std::min(row_ub, n_rows) - row_lb;
+        
+        // do scanning using that strategy
+        omp_set_num_threads(p_hat);
+        #pragma omp parallel
+        {
+            int tid = omp_get_thread_num();
+            int actual_num_threads = omp_get_num_threads();
+            assert(actual_num_threads == config.num_threads);
+            
+            #pragma omp for schedule(dynamic, config.batch_size)
+            for (size_t r = row_lb; r < std::min(row_ub, n_rows); r++) {
+                if (a_hat == StratEnum::CENTRAL) {
+                    local_agg_maps[tid].accumulate_from_row(table, r);
+                } else if (a_hat == StratEnum::TREE) {
+                    local_agg_maps[tid].accumulate_from_row(table, r);
+                } else if (a_hat == StratEnum::RADIX) {
+                    int64_t group_key = table.get(r, 0);
+                    size_t group_key_hash = std::hash<int64_t>{}(group_key);
+                    size_t part_idx = group_key_hash % n_partitions;
+                    radix_partitions_local_maps[part_idx][tid].accumulate_from_row(table, r);
+                } else if (a_hat == StratEnum::LOCKFREE) {
+                    bool succeeded = lock_free_map.upsert(table.get(r, 0), table.get(r, 1));
+                    assert(succeeded);
+                } else {
+                    throw std::runtime_error("unreachable");
+                }
+            }
+            
+            // each thread add the num of group keys they saw to g_tilde_sum
+        }
+        
+        // perofrm adaptation
+        // float G_hat = estimate_G(static_cast<float>(n_sampled_row), static_cast<float>(g_tilde_sum));
+        float G_hat = 2000.0f;
+        int G_hat_int = static_cast<int>(G_hat);
+        
+        if ((row_ub >= 10000000 && p * G_hat_int * (5 * 8) >= L3Size && 4 * G_hat_int <= 2 * row_ub) || a_hat == StratEnum::LOCKFREE) {
+            std::cout << ">> adaption-step=" << adaptation_step << ", adapt-to=lock-free" << std::endl;
+            a_hat = StratEnum::LOCKFREE;
+            p_hat = p;
+            int want_lock_free_map_size = G_hat_int * 4;
+            int acceptable_lock_free_map_size = G_hat_int * 3;
+            
+            if (lock_free_map.size < acceptable_lock_free_map_size) {
+                std::cout << "resizing lock free hmap" << std::endl;
+                // resize it to want_lock_free_map_size
+                LockFreeAggMap new_lock_free_map(want_lock_free_map_size);
+                for (auto& entry : lock_free_map.data) {
+                    if (entry.key.load() == INT64_MIN) { continue; }
+                    new_lock_free_map.accumulate_from_accval_elems(entry.key.load(), entry.cnt.load(), entry.sum.load(), entry.min.load(), entry.max.load());
+                }
+                lock_free_map = std::move(new_lock_free_map);
+            }
+            
+            touched_per_therad_maps = true;
+        } else {
+            StratEnum a_best = a_hat;
+            int p_best = p;
+            float cost_best = MAXFLOAT;
+
+            int p_hat_candidate=p;
+            // for (int p_hat_candidate = 1; p_hat_candidate <= p; p *= 2) {
+                float central_merge_cost = central_merge_cost_model(G_hat, 2 * S, p_hat_candidate);
+                float tree_merge_cost = tree_merge_cost_model(G_hat, 2 * S, p_hat_candidate);
+                float radix_merge_cost = radix_merge_cost_model(G_hat, 2 * S, p_hat_candidate);
+                float noradix_scan_cost = noradix_scan_cost_model(G_hat, 2 * S, p_hat_candidate);
+                float radix_scan_cost = radix_scan_cost_model(G_hat, 2 * S, p_hat_candidate, n_partitions);
+                float two_phase_central_cost = central_merge_cost + noradix_scan_cost;
+                float two_phase_radix_cost = radix_merge_cost + radix_scan_cost;
+                float two_phase_tree_cost = tree_merge_cost + noradix_scan_cost;
+                float min_strat_cost = std::min(two_phase_central_cost, std::min(two_phase_radix_cost, two_phase_tree_cost));
+                if (min_strat_cost < cost_best) {
+                    cost_best = min_strat_cost;
+                    p_best = p_hat_candidate;
+                    if (min_strat_cost == two_phase_central_cost) {
+                        a_best = StratEnum::CENTRAL;
+                    } else if (min_strat_cost == two_phase_tree_cost) {
+                        a_best = StratEnum::TREE;
+                    } else if (min_strat_cost == two_phase_radix_cost) {
+                        a_best = StratEnum::RADIX;
+                    } else {
+                        throw std::runtime_error("unreachable");
+                    }
+                }
+            // }
+            a_hat = a_best;
+            p_hat = p_best;
+            
+            if (a_hat == StratEnum::CENTRAL) {
+                std::cout << ">> adaption-step=" << adaptation_step << ", adapt-to=centralized-merge" << std::endl;
+                std::cout << ">> adaption-step=" << adaptation_step << ", set-p-to=" << p_hat << std::endl;
+                num_per_threads_map_used = std::max(num_per_threads_map_used, p_hat);
+            } else if (a_hat == StratEnum::TREE) {
+                std::cout << ">> adaption-step=" << adaptation_step << ", adapt-to=tree-merge" << std::endl;
+                std::cout << ">> adaption-step=" << adaptation_step << ", set-p-to=" << p_hat << std::endl;
+                num_per_threads_map_used = std::max(num_per_threads_map_used, p_hat);
+            } else if (a_hat == StratEnum::RADIX) {
+                std::cout << ">> adaption-step=" << adaptation_step << ", adapt-to=two-phase-radix" << std::endl;
+                std::cout << ">> adaption-step=" << adaptation_step << ", set-p-to=" << p_hat << std::endl;
+                touched_radix = true;
+            } else {
+                throw std::runtime_error("unreachable");
+            }
+        }
+        
+        row_lb = row_ub;
+        S *= 2;
+        row_ub = row_lb + S;
+        adaptation_step += 1;
+    } while (row_lb < n_rows);
+    
+    // parallel merge radix
+    if (touched_radix) {
+        #pragma omp parallel
+        {
+            #pragma omp for schedule(dynamic, 1)
+            for (size_t part_idx = 0; part_idx < n_partitions; part_idx++) {
+                for (size_t other_tid = 1; other_tid < p; other_tid++) {
+                    auto other_local_agg_map = radix_partitions_local_maps[part_idx][other_tid];
+                    radix_partitions_local_maps[part_idx][0].merge_from(other_local_agg_map);
+                }
+            }
+        }
+    }
+    
+    // combine results in the multiple data structures
+    if (touched_lock_free) {
+        // merge everything into lock free...
+        if (touched_radix) {
+            #pragma omp parallel
+            {
+                #pragma omp for schedule(dynamic, 1)
+                for (size_t part_idx = 0; part_idx < n_partitions; part_idx++) {
+                    for (size_t other_tid = 0; other_tid < p; other_tid++) {
+                        for (auto& [key, val] : radix_partitions_local_maps[part_idx][other_tid]) {
+                            bool succeeded = lock_free_map.accumulate_from_accval(key, val);
+                            assert(succeeded);
+                        }
+                    }
+                }
+            }
+        }
+        if (touched_per_therad_maps) {
+            #pragma omp parallel
+            {
+                #pragma omp for schedule(dynamic, 1)
+                for (size_t other_tid = 0; other_tid < num_per_threads_map_used; other_tid++) {
+                    for (auto& [key, val] : local_agg_maps[other_tid]) {
+                        bool succeeded = lock_free_map.accumulate_from_accval(key, val);
+                        assert(succeeded);
+                    }
+                }
+            }
+        }
+    } else if (touched_radix) {
+        if (touched_per_therad_maps) {
+            // merge thread local into radix and done
+            for (int other_tid = 0; other_tid < num_per_threads_map_used; other_tid++) {
+                
+                for (const auto& [group_key, other_agg_acc] : local_agg_maps[other_tid]) {
+                    size_t group_key_hash = std::hash<int64_t>{}(group_key);
+                    size_t part_idx = group_key_hash % n_partitions;
+                    radix_partitions_local_maps[part_idx][0].accumulate_from_agg_acc(group_key, other_agg_acc);
+                }
+
+                local_agg_maps[0].merge_from(local_agg_maps[other_tid]);
+            }
+
+        }
+    } else {
+        // just merge all the thread local
+        if (a_hat == StratEnum::TREE) {
+            omp_set_num_threads(p);
+            #pragma omp parallel
+            {
+                int tid = omp_get_thread_num();
+                for (int merge_step = 2; merge_step <= num_per_threads_map_used; merge_step *= 2) {
+                    if (tid % merge_step == 0) {
+                        int other_tid = tid + (merge_step / 2);
+                        if (other_tid < p) {
+                            local_agg_maps[tid].merge_from(local_agg_maps[other_tid]);
+                        }
+                    }
+                    #pragma omp barrier
+                }
+            }
+        }
+        if (a_hat == StratEnum::CENTRAL) {
+            for (int other_tid = 1; other_tid < num_per_threads_map_used; other_tid++) {
+                local_agg_maps[0].merge_from(local_agg_maps[other_tid]);
+            }
+        }
+        // result lives in local_agg_maps[0]
+        std::cout << "result in local_agg_maps[0] with size " << local_agg_maps[0].size() << std::endl; 
+    }
+    
+    t_agg_1 = std::chrono::steady_clock::now();
+    time_print("aggregation_time", trial_idx, t_overall_0, t_overall_1, do_print_stats);
+    
+    t_overall_1 = std::chrono::steady_clock::now();
+    time_print("elapsed_time", trial_idx, t_overall_0, t_overall_1, do_print_stats);
+    
+    exit(1);
+}
