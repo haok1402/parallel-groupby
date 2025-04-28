@@ -1,7 +1,7 @@
 #include "../lib.hpp"
 #include "_all_algs.hpp"
 
-const int sample_prefix_len = 1000;
+const int sample_prefix_len = 10000;
 
 enum class StratEnum {
     RADIX,
@@ -60,7 +60,7 @@ void adaptive_alg1_sol(ExpConfig &config, RowStore &table, int trial_idx, bool d
     std::cout << "G_hat = " << G_hat << std::endl;
     std::cout << "config.num_threads = " << config.num_threads << std::endl;
     
-    if (G_hat < 50000) {
+    if (G_hat < 500000 && config.num_threads < 32) {
         if (config.num_threads <= 4) {
             // use centralized merge
             std::cout << ">> strat-decided=centralized-merge" << std::endl;

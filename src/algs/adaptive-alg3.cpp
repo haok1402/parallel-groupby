@@ -3,10 +3,6 @@
 #include <flat_hash_map.hpp>
 #include "xxhash.h"
 
-// TODO don't use a funny number
-const int L3Size = 256000000;  // PSC should be this
-// const int L3Size = 256000;  // for testing
-
 enum class StratEnum {
     RADIX,
     TREE,
@@ -27,7 +23,7 @@ float central_merge_cost_model(float G, int S_int, int p_int) {
 // estimate tree merge cost if there are G keys, we have seen S rows, and we have p processors
 float tree_merge_cost_model(float G, int S_int, int p_int) {
     float groups_per_thread = static_cast<float>(S_int);
-    const float lambda = 1.2f;
+    const float lambda = 1.1f;
     float p = static_cast<float>(p_int);
     
     float sum = 0.0f;
@@ -179,18 +175,23 @@ void adaptive_alg3_sol(ExpConfig &config, RowStore &table, int trial_idx, bool d
         std::cout << "<sampling> n_sampled_row = " << n_sampled_row << std::endl;
         std::cout << "<sampling> g_tilde_sum = " << g_tilde_sum << std::endl;
         float G_hat = estimate_G(static_cast<float>(n_sampled_row), static_cast<float>(g_tilde_sum));
+        float prev_max_G_hat = max_G_hat;
         max_G_hat = std::max(max_G_hat, G_hat);
-        G_hat = max_G_hat;
+        // G_hat = max_G_hat;
         std::cout << "<sampling> G_hat = " << G_hat << std::endl;
-        // float G_hat = 2000.0f;
-        int G_hat_int = static_cast<int>(G_hat);
+        std::cout << "<sampling> max_G_hat = " << max_G_hat << std::endl;
+        int G_hat_int = static_cast<int>(max_G_hat);
         
-        if ((row_ub >= 10000000 && p * G_hat_int * (5 * 8) >= L3Size && 4 * G_hat_int <= 2 * row_ub) || a_hat == StratEnum::LOCKFREE) {
+        // once we see enough rows, enough groups, and see that G_hat stablizes, we decide to switch to lock free
+        if ((row_ub >= 5000000 && G_hat_int >= 500000 && G_hat <= 1.1 * prev_max_G_hat) || a_hat == StratEnum::LOCKFREE) {
             std::cout << ">> adaption-step=" << adaptation_step << ", adapt-to=lock-free" << std::endl;
             a_hat = StratEnum::LOCKFREE;
             p_hat = p;
             int want_lock_free_map_size = G_hat_int * 12;
             int acceptable_lock_free_map_size = G_hat_int * 4;
+
+            std::cout << "want_lock_free_map_size" << want_lock_free_map_size << std::endl;
+            std::cout << "acceptable_lock_free_map_size" << acceptable_lock_free_map_size << std::endl;
             
             if (lock_free_map.size < acceptable_lock_free_map_size && (!touched_lock_free)) {
                 std::cout << "resizing lock free hmap" << std::endl;
@@ -211,11 +212,11 @@ void adaptive_alg3_sol(ExpConfig &config, RowStore &table, int trial_idx, bool d
 
             int p_hat_candidate=p;
             // for (int p_hat_candidate = 1; p_hat_candidate <= p; p *= 2) {
-                float central_merge_cost = central_merge_cost_model(G_hat, 2 * S, p_hat_candidate);
-                float tree_merge_cost = tree_merge_cost_model(G_hat, 2 * S, p_hat_candidate);
-                float radix_merge_cost = radix_merge_cost_model(G_hat, 2 * S, p_hat_candidate);
-                float noradix_scan_cost = noradix_scan_cost_model(G_hat, 2 * S, p_hat_candidate);
-                float radix_scan_cost = radix_scan_cost_model(G_hat, 2 * S, p_hat_candidate, n_partitions);
+                float central_merge_cost = central_merge_cost_model(max_G_hat, 2 * S, p_hat_candidate);
+                float tree_merge_cost = tree_merge_cost_model(max_G_hat, 2 * S, p_hat_candidate);
+                float radix_merge_cost = radix_merge_cost_model(max_G_hat, 2 * S, p_hat_candidate);
+                float noradix_scan_cost = noradix_scan_cost_model(max_G_hat, 2 * S, p_hat_candidate);
+                float radix_scan_cost = radix_scan_cost_model(max_G_hat, 2 * S, p_hat_candidate, n_partitions);
                 float two_phase_central_cost = central_merge_cost + noradix_scan_cost;
                 float two_phase_radix_cost = radix_merge_cost + radix_scan_cost;
                 float two_phase_tree_cost = tree_merge_cost + noradix_scan_cost;

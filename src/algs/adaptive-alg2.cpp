@@ -1,6 +1,6 @@
 #include "../lib.hpp"
 
-const int sample_prefix_len = 1000;
+const int sample_prefix_len = 10000;
 
 enum class StratEnum {
     RADIX,
@@ -16,7 +16,7 @@ float central_merge_cost_model(float G, int p_int) {
 
 // estimate tree merge cost if there are G keys, we have seen S rows, and we have p processors
 float tree_merge_cost_model(float G, int p_int) {
-    const float lambda = 1.2f;
+    const float lambda = 1.1f;
     float p = static_cast<float>(p_int);
     
     return 
