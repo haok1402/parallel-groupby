@@ -32,6 +32,13 @@ void print_agg_stats(std::vector<AggResRow> agg_res) {
 }
 
 int main(int argc, char *argv[]) {
+
+    // int n_sampled_row = 1110000;
+    // int g_tilde_sum = 1079607;
+
+    // float est = estimate_G(((float) n_sampled_row), ((float) g_tilde_sum));
+    // std::cout << "est = " << est << std::endl;
+    // exit(0);
     
     // 1 > parse command line
     
