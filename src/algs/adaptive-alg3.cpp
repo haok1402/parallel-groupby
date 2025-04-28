@@ -63,10 +63,6 @@ float radix_scan_cost_model(float G, int S_int, int p_int, int num_partitions) {
     return 2.0f * groups_per_thread + G * log2(G / N);
 }
 
-
-// phase 0: do sampling and decide on strategy
-// phase 1: each thread does local aggregation
-// phase 2: threads go merge
 void adaptive_alg3_sol(ExpConfig &config, RowStore &table, int trial_idx, bool do_print_stats, std::vector<AggResRow> &agg_res) {
 
     auto n_cols = table.n_cols;
