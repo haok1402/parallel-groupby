@@ -62,21 +62,21 @@ void adaptive_alg1_sol(ExpConfig &config, RowStore &table, int trial_idx, bool d
     if (G_hat < 50000) {
         if (config.num_threads <= 4) {
             // use centralized merge
-            std::cout << "decided to use centralized merge" << std::endl;
+            std::cout << ">> strat-decided=centralized-merge" << std::endl;
             strat_decision = StratEnum::CENTRAL;
         } else {
             // use tree merge
-            std::cout << "decided to use tree merge" << std::endl;
+            std::cout << ">> strat-decided=tree-merge" << std::endl;
             strat_decision = StratEnum::TREE;
         }
     } else {
         if (config.num_threads < 16 && (100 * g_tilde < 95 * sample_prefix_len)) { // to be safe, we can only be confident about potential htable size if the prefix isn't saturated by new keys
             // use lock free
-            std::cout << "decided to use lock free" << std::endl;
+            std::cout << ">> strat-decided=lock-free" << std::endl;
             strat_decision = StratEnum::LOCKFREE;
         } else {
             // use two phase radix
-            std::cout << "decided to use two phase radix" << std::endl;
+            std::cout << ">> strat-decided=two-phase-radix" << std::endl;
             strat_decision = StratEnum::RADIX;
         }
     }

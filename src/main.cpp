@@ -41,7 +41,7 @@ int main(int argc, char *argv[]) {
     config.num_dryruns = 0;
     config.num_trials = 1;
     config.cardinality_reduction = -1; // option to reduce the number of unique group keys, or -1 to not do it
-    config.batch_size = 10000;
+    config.batch_size = 100000;
     config.duckdb_style_adaptation_threshold = 10000;
     config.algorithm = "SEQUENTIAL";
     config.dataset_file_path = "data/exponential/100K-1K.csv.gz";

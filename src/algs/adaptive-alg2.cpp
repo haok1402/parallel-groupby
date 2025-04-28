@@ -118,13 +118,13 @@ void adaptive_alg2_sol(ExpConfig &config, RowStore &table, int trial_idx, bool d
     float min_strat_cost = std::min(two_phase_central_cost, std::min(two_phase_radix_cost, two_phase_tree_cost));
 
     if (min_strat_cost == two_phase_central_cost) {
-        std::cout << "decided to use centralized merge" << std::endl;
+        std::cout << ">> strat-decided=centralized-merge" << std::endl;
         strat_decision = StratEnum::CENTRAL;
     } else if (min_strat_cost == two_phase_tree_cost) {
-        std::cout << "decided to use tree merge" << std::endl;
+        std::cout << ">> strat-decided=tree-merge" << std::endl;
         strat_decision = StratEnum::TREE;
     } else if (min_strat_cost == two_phase_radix_cost) {
-        std::cout << "decided to use two phase radix" << std::endl;
+        std::cout << ">> strat-decided=two-phase-radix" << std::endl;
         strat_decision = StratEnum::RADIX;
     } else {
         throw std::runtime_error("unreachable");
