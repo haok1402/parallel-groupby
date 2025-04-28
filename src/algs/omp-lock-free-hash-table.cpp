@@ -27,7 +27,7 @@ void omp_lock_free_hash_table_sol(ExpConfig &config, RowStore &table, int trial_
     t_aggregate_0 = std::chrono::steady_clock::now();
 
     auto n_rows = table.n_rows;
-    AggMap map(n_rows);
+    LockFreeAggMap map(n_rows);
 
     int num_threads = config.num_threads;
 

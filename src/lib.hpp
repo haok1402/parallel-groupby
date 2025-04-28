@@ -183,6 +183,20 @@ public:
         agg_map[group_key] = agg_acc;
     }
     
+    inline void accumulate_from_agg_acc(int64_t group_key, AggMapValue other_agg_acc) {
+
+        // find existing entry, if not initialise
+        AggMapValue agg_acc = entry_or_default(group_key);
+
+        // do the aggregation
+        agg_acc[0] = agg_acc[0] + other_agg_acc[0]; // count
+        agg_acc[1] = agg_acc[1] + other_agg_acc[1]; // sum
+        agg_acc[2] = std::min(agg_acc[2], other_agg_acc[2]); // min
+        agg_acc[3] = std::max(agg_acc[3], other_agg_acc[3]); // max
+        
+        agg_map[group_key] = agg_acc;
+    }
+    
     inline void merge_from(const XXHashAggMap &other_agg_map) {
         for (const auto& [group_key, other_agg_acc] : other_agg_map) {
             AggMapValue agg_acc = entry_or_default(group_key);
@@ -294,10 +308,10 @@ struct AggEntrySnapshot
     int64_t max;
 };
 
-class AggMap
+class LockFreeAggMap
 {
     public:
-        explicit AggMap(size_t n)
+        explicit LockFreeAggMap(size_t n)
             : size(n), data(n) {}
 
         inline bool upsert(int64_t k, int64_t v)
@@ -337,6 +351,27 @@ class AggMap
                     while (val[2] < cur_min && !data[j].min.compare_exchange_weak(cur_min, val[2], std::memory_order_relaxed));
                     int64_t cur_max = data[j].max.load(std::memory_order_relaxed);
                     while (val[3] > cur_max && !data[j].max.compare_exchange_weak(cur_max, val[3], std::memory_order_relaxed));
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        inline bool accumulate_from_accval_elems(int64_t k, int64_t cnt, int64_t sum, int64_t min, int64_t max) {
+            size_t i = std::hash<int64_t>{} (k);
+            for (size_t probe = 0; probe < size; probe++)
+            {
+                size_t j = (i + probe) % size;
+                int64_t expected = INT64_MIN;
+
+                if (data[j].key.compare_exchange_strong(expected, k, std::memory_order_acq_rel, std::memory_order_acquire) || expected == k)
+                {
+                    data[j].cnt.fetch_add(cnt, std::memory_order_relaxed);
+                    data[j].sum.fetch_add(sum, std::memory_order_relaxed);
+                    int64_t cur_min = data[j].min.load(std::memory_order_relaxed);
+                    while (min < cur_min && !data[j].min.compare_exchange_weak(cur_min, min, std::memory_order_relaxed));
+                    int64_t cur_max = data[j].max.load(std::memory_order_relaxed);
+                    while (max > cur_max && !data[j].max.compare_exchange_weak(cur_max, max, std::memory_order_relaxed));
                     return true;
                 }
             }

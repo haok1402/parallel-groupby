@@ -298,7 +298,7 @@ void adaptive_alg1_sol(ExpConfig &config, RowStore &table, int trial_idx, bool d
     } else if (strat_decision == StratEnum::LOCKFREE) {
 
         t_agg_0 = std::chrono::steady_clock::now();
-        AggMap map(static_cast<size_t>(G_hat) * 4);
+        LockFreeAggMap map(static_cast<size_t>(G_hat) * 4);
 
         bool htable_overflow = false;
         
