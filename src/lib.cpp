@@ -83,7 +83,7 @@ float estimate_G(float k, float g_tilde) {
     // find an upper bound
     while (expected_g(k, hi) < g_tilde) {
         std::cout << "hi = " << hi << std::endl;
-        if (hi > 10000000.0f) { // avoid overflow and inifinite loop... sometimes expected_g is not precise enough to find the right hi...
+        if (hi > 100000000.0f) { // avoid overflow and inifinite loop... sometimes expected_g is not precise enough to find the right hi...
             break;
         }
         hi *= 2.0f;
