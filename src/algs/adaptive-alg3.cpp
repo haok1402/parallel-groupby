@@ -1,7 +1,9 @@
 #include "../lib.hpp"
 #include <cmath>
 
-const int sample_prefix_len = 1000;
+// TODO don't use a funny number
+// const int L3Size = 256000000;  // PSC should be this
+const int L3Size = 256000;  // for testing
 
 enum class StratEnum {
     RADIX,
@@ -58,8 +60,6 @@ float radix_scan_cost_model(float G, int S_int, int p_int, int num_partitions) {
     return 2.0f * groups_per_thread + G * log2(G / N);
 }
 
-// const int L3Size = 256000000;  // PSC should be this
-const int L3Size = 256000;  // for testing
 
 // phase 0: do sampling and decide on strategy
 // phase 1: each thread does local aggregation
@@ -171,7 +171,7 @@ void adaptive_alg3_sol(ExpConfig &config, RowStore &table, int trial_idx, bool d
                 lock_free_map = std::move(new_lock_free_map);
             }
             
-            touched_per_therad_maps = true;
+            touched_lock_free = true;
         } else {
             StratEnum a_best = a_hat;
             int p_best = p;
@@ -240,55 +240,16 @@ void adaptive_alg3_sol(ExpConfig &config, RowStore &table, int trial_idx, bool d
                 }
             }
         }
+        // merged into radix_partitions_local_maps[any part_idx][0]
     }
     
-    // combine results in the multiple data structures
-    if (touched_lock_free) {
-        // merge everything into lock free...
-        if (touched_radix) {
-            #pragma omp parallel
-            {
-                #pragma omp for schedule(dynamic, 1)
-                for (size_t part_idx = 0; part_idx < n_partitions; part_idx++) {
-                    for (size_t other_tid = 0; other_tid < p; other_tid++) {
-                        for (auto& [key, val] : radix_partitions_local_maps[part_idx][other_tid]) {
-                            bool succeeded = lock_free_map.accumulate_from_accval(key, val);
-                            assert(succeeded);
-                        }
-                    }
-                }
-            }
-        }
-        if (touched_per_therad_maps) {
-            #pragma omp parallel
-            {
-                #pragma omp for schedule(dynamic, 1)
-                for (size_t other_tid = 0; other_tid < num_per_threads_map_used; other_tid++) {
-                    for (auto& [key, val] : local_agg_maps[other_tid]) {
-                        bool succeeded = lock_free_map.accumulate_from_accval(key, val);
-                        assert(succeeded);
-                    }
-                }
-            }
-        }
-    } else if (touched_radix) {
-        if (touched_per_therad_maps) {
-            // merge thread local into radix and done
-            for (int other_tid = 0; other_tid < num_per_threads_map_used; other_tid++) {
-                
-                for (const auto& [group_key, other_agg_acc] : local_agg_maps[other_tid]) {
-                    size_t group_key_hash = std::hash<int64_t>{}(group_key);
-                    size_t part_idx = group_key_hash % n_partitions;
-                    radix_partitions_local_maps[part_idx][0].accumulate_from_agg_acc(group_key, other_agg_acc);
-                }
-
+    // merge the local maps
+    if (touched_per_therad_maps) {
+        if (a_hat == StratEnum::CENTRAL) {
+            for (int other_tid = 1; other_tid < num_per_threads_map_used; other_tid++) {
                 local_agg_maps[0].merge_from(local_agg_maps[other_tid]);
             }
-
-        }
-    } else {
-        // just merge all the thread local
-        if (a_hat == StratEnum::TREE) {
+        } else {
             omp_set_num_threads(p);
             #pragma omp parallel
             {
@@ -304,20 +265,55 @@ void adaptive_alg3_sol(ExpConfig &config, RowStore &table, int trial_idx, bool d
                 }
             }
         }
-        if (a_hat == StratEnum::CENTRAL) {
-            for (int other_tid = 1; other_tid < num_per_threads_map_used; other_tid++) {
-                local_agg_maps[0].merge_from(local_agg_maps[other_tid]);
+        // merged into local_agg_maps[0]
+    }
+    
+    
+    // combine results in the multiple data structures
+    if (touched_lock_free) {
+        // merge everything into lock free...
+        if (touched_radix) {
+            #pragma omp parallel
+            {
+                #pragma omp for schedule(dynamic, 1)
+                for (size_t part_idx = 0; part_idx < n_partitions; part_idx++) {
+                    for (auto& [key, val] : radix_partitions_local_maps[part_idx][0]) {
+                        bool succeeded = lock_free_map.accumulate_from_accval(key, val);
+                        assert(succeeded);
+                    }
+                }
             }
         }
+        if (touched_per_therad_maps) {
+            for (auto& [key, val] : local_agg_maps[0]) {
+                bool succeeded = lock_free_map.accumulate_from_accval(key, val);
+                assert(succeeded);
+            }
+        }
+        
+        std::cout << "results are in lock free hash table with max size " << lock_free_map.size << std::endl; 
+
+    } else if (touched_radix) {
+        if (touched_per_therad_maps) {
+            // tree merge the 
+            
+            // merge thread local into radix and done
+            for (const auto& [group_key, other_agg_acc] : local_agg_maps[0]) {
+                size_t group_key_hash = std::hash<int64_t>{}(group_key);
+                size_t part_idx = group_key_hash % n_partitions;
+                radix_partitions_local_maps[part_idx][0].accumulate_from_agg_acc(group_key, other_agg_acc);
+            }
+        }
+        std::cout << "result in all radix_partitions_local_maps[any part_idx][0]" << std::endl; 
+
+    } else {
         // result lives in local_agg_maps[0]
         std::cout << "result in local_agg_maps[0] with size " << local_agg_maps[0].size() << std::endl; 
     }
     
     t_agg_1 = std::chrono::steady_clock::now();
-    time_print("aggregation_time", trial_idx, t_overall_0, t_overall_1, do_print_stats);
+    time_print("aggregation_time", trial_idx, t_agg_0, t_agg_1, do_print_stats);
     
     t_overall_1 = std::chrono::steady_clock::now();
     time_print("elapsed_time", trial_idx, t_overall_0, t_overall_1, do_print_stats);
-    
-    exit(1);
 }

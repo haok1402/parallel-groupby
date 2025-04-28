@@ -47,6 +47,7 @@ void omp_lock_free_hash_table_sol(ExpConfig &config, RowStore &table, int trial_
 
     for (auto& entry : map.data)
     {
+        if (entry.key.load() == INT64_MIN) continue;
         agg_res.push_back(AggResRow{entry.key.load(), entry.cnt.load(), entry.sum.load(), entry.min.load(), entry.max.load()});
     }
 
