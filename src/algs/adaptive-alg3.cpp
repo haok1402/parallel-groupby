@@ -126,6 +126,7 @@ void adaptive_alg3_sol(ExpConfig &config, RowStore &table, int trial_idx, bool d
         
         
         // do scanning using that strategy
+        std::cout << "start parallel scan" << std::endl;
         omp_set_num_threads(p_hat);
         #pragma omp parallel
         {
@@ -167,6 +168,7 @@ void adaptive_alg3_sol(ExpConfig &config, RowStore &table, int trial_idx, bool d
         
             // each thread add the num of group keys they saw to g_tilde_sum
         }
+        std::cout << "end" << std::endl;
         
         // maybe we're done, in which case exit
         if (row_ub >= n_rows) {
@@ -174,11 +176,11 @@ void adaptive_alg3_sol(ExpConfig &config, RowStore &table, int trial_idx, bool d
         }
         
         // perofrm adaptation
+        std::cout << "<sampling> n_sampled_row = " << n_sampled_row << std::endl;
+        std::cout << "<sampling> g_tilde_sum = " << g_tilde_sum << std::endl;
         float G_hat = estimate_G(static_cast<float>(n_sampled_row), static_cast<float>(g_tilde_sum));
         max_G_hat = std::max(max_G_hat, G_hat);
         G_hat = max_G_hat;
-        std::cout << "<sampling> n_sampled_row = " << n_sampled_row << std::endl;
-        std::cout << "<sampling> g_tilde_sum = " << g_tilde_sum << std::endl;
         std::cout << "<sampling> G_hat = " << G_hat << std::endl;
         // float G_hat = 2000.0f;
         int G_hat_int = static_cast<int>(G_hat);
