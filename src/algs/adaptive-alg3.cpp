@@ -187,8 +187,8 @@ void adaptive_alg3_sol(ExpConfig &config, RowStore &table, int trial_idx, bool d
             std::cout << ">> adaption-step=" << adaptation_step << ", adapt-to=lock-free" << std::endl;
             a_hat = StratEnum::LOCKFREE;
             p_hat = p;
-            int want_lock_free_map_size = G_hat_int * 4;
-            int acceptable_lock_free_map_size = G_hat_int * 3;
+            int want_lock_free_map_size = G_hat_int * 12;
+            int acceptable_lock_free_map_size = G_hat_int * 4;
             
             if (lock_free_map.size < acceptable_lock_free_map_size && (!touched_lock_free)) {
                 std::cout << "resizing lock free hmap" << std::endl;
