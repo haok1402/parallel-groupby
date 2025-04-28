@@ -30,11 +30,10 @@ def main():
     else:
         rinspect(args,  title="args")
     
-    match args.engine:
-        case 'polars':
-            bench_polars(args)
-        case 'duckdb':
-            bench_duckdb(args)
+    if args.engine == "polars":
+        bench_polars(args)
+    elif args.engine == "duckdb":
+        bench_duckdb(args)
     
 def bench_polars(args):
     os.environ["POLARS_MAX_THREADS"] = str(args.num_threads)

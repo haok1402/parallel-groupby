@@ -28,16 +28,17 @@ oob_engines=() # out of the box engines to benchmark
 # algorithms=('two-phase-radix-xxhash' 'lock-free-hash-table' 'two-phase-central-merge' 'duckdbish-two-phase' 'implicit-repartitioning' 'three-phase-radix' 'two-phase-radix')
 # algorithms=('two-phase-central-merge-xxhash' 'two-phase-radix-xxhash' 'duckdbish-two-phase' 'lock-free-hash-table' 'implicit-repartitioning') # algorithms we implement
 # algorithms=('omp-lock-free-hash-table' 'two-phase-tree-merge')
-algorithms=('adaptive-alg1' 'adaptive-alg2')
+algorithms=('adaptive-alg1' 'adaptive-alg2' 'omp-lock-free-hash-table' 'two-phase-tree-merge' 'two-phase-radix-xxhash' 'two-phase-central-merge-xxhash')
 
-distributions=('exponential' 'normal')
+distributions=('uniform')
 
 # size_configs=('8M-2M')
 # size_configs=('8M-2K' '8M-20K' '8M-200K' '8M-2M'    '80M-20K' '80M-200K' '80M-2M' '80M-20M')
 # '8M-2K' '8M-20K' '8M-200K' '8M-2M'   '80M-20K' '80M-200K' '80M-2M' '80M-20M'    '800M-200K' '800M-2M' '800M-20M' '800M-200M'
 size_configs=('80M-20K' '80M-200K' '80M-2M' '80M-20M')
 
-possible_np=(1 2 4 8 16 32 64 128)
+# possible_np=(1 2 4 8 16 32 64 128)
+possible_np=(64)
 max_np=$3
 num_dryruns=3
 num_trials=5
