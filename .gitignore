@@ -32,3 +32,4 @@ logs
 results/*.parquet
 results/*.pdf
 results/*.png
+results/*.svg
