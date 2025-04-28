@@ -39,6 +39,7 @@ void adaptive_alg1_sol(ExpConfig &config, RowStore &table, int trial_idx, bool d
     t_phase0_0 = std::chrono::steady_clock::now();
 
     auto sample_phase_agg_map = XXHashAggMap();
+    auto hasher = I64Hasher{};
     
     // === PHASE 0: do sampling ===
     
@@ -93,7 +94,7 @@ void adaptive_alg1_sol(ExpConfig &config, RowStore &table, int trial_idx, bool d
         auto local_agg_maps = std::vector<XXHashAggMap>(config.num_threads);
         assert(local_agg_maps.size() == config.num_threads);
         XXHashAggMap agg_map; // where merged results go
-        agg_map.reserve(G_hat_int);
+        // agg_map.reserve(G_hat_int);
         
         #pragma omp parallel
         {
@@ -103,7 +104,7 @@ void adaptive_alg1_sol(ExpConfig &config, RowStore &table, int trial_idx, bool d
             
             // PHASE 1: local aggregation map
             XXHashAggMap local_agg_map;
-            local_agg_map.reserve(G_hat_int);
+            // local_agg_map.reserve(G_hat_int);
             
             if (tid == 0) { t_phase1_0 = std::chrono::steady_clock::now(); }
             
@@ -155,7 +156,7 @@ void adaptive_alg1_sol(ExpConfig &config, RowStore &table, int trial_idx, bool d
         auto local_agg_maps = std::vector<XXHashAggMap>(config.num_threads);
         assert(local_agg_maps.size() == config.num_threads);
         XXHashAggMap agg_map; // where merged results go        
-        agg_map.reserve(G_hat_int);
+        // agg_map.reserve(G_hat_int);
         
         #pragma omp parallel
         {
@@ -165,7 +166,7 @@ void adaptive_alg1_sol(ExpConfig &config, RowStore &table, int trial_idx, bool d
             
             // PHASE 1: local aggregation map
             XXHashAggMap local_agg_map;
-            local_agg_map.reserve(G_hat_int);
+            // local_agg_map.reserve(G_hat_int);
             
             if (tid == 0) { t_phase1_0 = std::chrono::steady_clock::now(); }
             
@@ -230,7 +231,7 @@ void adaptive_alg1_sol(ExpConfig &config, RowStore &table, int trial_idx, bool d
             std::vector<XXHashAggMap> local_radix_partitions(n_partitions);
             for (size_t i = 0; i < n_partitions; i++) {
                 local_radix_partitions[i] = XXHashAggMap();
-                local_radix_partitions[i].reserve(G_hat_int);
+                // local_radix_partitions[i].reserve(G_hat_int);
             }
             
             if (tid == 0) { t_phase1_0 = std::chrono::steady_clock::now(); }
@@ -238,7 +239,6 @@ void adaptive_alg1_sol(ExpConfig &config, RowStore &table, int trial_idx, bool d
             #pragma omp for schedule(dynamic, config.batch_size)
             for (size_t r = 0; r < n_rows; r++) {
                 int64_t group_key = table.get(r, 0);
-                
                 size_t group_key_hash = std::hash<int64_t>{}(group_key);
                 size_t part_idx = group_key_hash % n_partitions;
                 
@@ -298,7 +298,7 @@ void adaptive_alg1_sol(ExpConfig &config, RowStore &table, int trial_idx, bool d
     } else if (strat_decision == StratEnum::LOCKFREE) {
 
         t_agg_0 = std::chrono::steady_clock::now();
-        AggMap map(static_cast<size_t>(G_hat) * 4);
+        LockFreeAggMap map(static_cast<size_t>(G_hat) * 4);
 
         bool htable_overflow = false;
         
@@ -331,6 +331,7 @@ void adaptive_alg1_sol(ExpConfig &config, RowStore &table, int trial_idx, bool d
     
         for (auto& entry : map.data)
         {
+            if (entry.key.load() == INT64_MIN) continue;
             agg_res.push_back(AggResRow{entry.key.load(), entry.cnt.load(), entry.sum.load(), entry.min.load(), entry.max.load()});
         }
     

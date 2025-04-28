@@ -79,7 +79,7 @@ void two_phase_tree_merge_sol(ExpConfig &config, RowStore &table, int trial_idx,
     // write output to vector
     {
         t_output_0 = std::chrono::steady_clock::now();
-        for (auto& [group_key, agg_acc] : agg_map) {
+        for (auto& [group_key, agg_acc] : local_agg_maps[0]) {
             agg_res.push_back(AggResRow{group_key, agg_acc[0], agg_acc[1], agg_acc[2], agg_acc[3]});
         }
         t_output_1 = std::chrono::steady_clock::now();

@@ -27,7 +27,7 @@ void lock_free_hash_table_sol(ExpConfig &config, RowStore &table, int trial_idx,
     t_aggregate_0 = std::chrono::steady_clock::now();
 
     auto n_rows = table.n_rows;
-    AggMap map(n_rows);
+    LockFreeAggMap map(n_rows);
 
     int num_threads = config.num_threads;
 
@@ -55,6 +55,7 @@ void lock_free_hash_table_sol(ExpConfig &config, RowStore &table, int trial_idx,
 
     for (auto& entry : map.data)
     {
+        if (entry.key.load() == INT64_MIN) continue;
         agg_res.push_back(AggResRow{entry.key.load(), entry.cnt.load(), entry.sum.load(), entry.min.load(), entry.max.load()});
     }
 

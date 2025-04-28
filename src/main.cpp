@@ -12,6 +12,7 @@
 #include "algs/_all_algs.hpp"
 
 void validate_results(std::vector<AggResRow> agg_res, std::unordered_map<int64_t, AggMapValue> reference_agg_map) {
+    std::cout << "agg_res has size " << agg_res.size() << ", check this manually" << std::endl;
     for (const auto& row : agg_res) {
         // if row in reference_agg_map, check each value equal
         auto group_key = row[0];
@@ -106,8 +107,8 @@ int main(int argc, char *argv[]) {
         selected_alg = adaptive_alg1_sol;
     } else if (config.algorithm == "adaptive-alg2") {
         selected_alg = adaptive_alg2_sol;
-    // } else if (config.algorithm == "adaptive-alg3") {
-    //     selected_alg = adaptive_alg3_sol;
+    } else if (config.algorithm == "adaptive-alg3") {
+        selected_alg = adaptive_alg3_sol;
     // } else if (config.algorithm == "adaptive-alg4") {
     //     selected_alg = adaptive_alg4_sol;
     } else {
