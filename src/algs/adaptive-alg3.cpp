@@ -31,7 +31,7 @@ float tree_merge_cost_model(float G, int S_int, int p_int) {
     float p = static_cast<float>(p_int);
     
     float sum = 0.0f;
-    for (int l = 0; l < p_int; l *= 2) {
+    for (int l = 0; l < p_int; l += 1) {
         sum += (1.0f - std::pow((1.0f - G) / G, groups_per_thread * (0x1 << l)));
     }
     
