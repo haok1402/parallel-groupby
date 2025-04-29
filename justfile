@@ -142,3 +142,7 @@ setup-omp:
     # need to do
     # export LDFLAGS="-L/opt/homebrew/opt/libomp/lib"
     # export CPPFLAGS="-I/opt/homebrew/opt/libomp/include"
+
+
+submit:
+    tar -czvf submission.tar.gz src/**/*.cpp src/*.cpp src/**/*.hpp src/*.hpp CMakeLists.txt README.md src-go/*.go src-rs/*.rs src-rs/*.toml src-rs/*.lock src-rs/src/*.rs src-go/go.mod
