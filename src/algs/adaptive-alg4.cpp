@@ -3,6 +3,7 @@
 #include <flat_hash_map.hpp>
 #include "xxhash.h"
 
+
 enum class StratEnum {
     RADIX,
     TREE,
@@ -11,7 +12,7 @@ enum class StratEnum {
 };
 
 // estimate central merge cost if there are G keys, we have seen S rows, and we have p processors
-float central_merge_cost_model(float G, int S_int, int p_int) {
+float central_merge_cost_model2(float G, int S_int, int p_int) {
     float groups_per_thread = static_cast<float>(S_int);
     float p = static_cast<float>(p_int);
     return 
@@ -21,7 +22,7 @@ float central_merge_cost_model(float G, int S_int, int p_int) {
 }
 
 // estimate tree merge cost if there are G keys, we have seen S rows, and we have p processors
-float tree_merge_cost_model(float G, int S_int, int p_int) {
+float tree_merge_cost_model2(float G, int S_int, int p_int) {
     float groups_per_thread = static_cast<float>(S_int);
     const float lambda = 1.1f;
     float p = static_cast<float>(p_int);
@@ -43,7 +44,7 @@ float tree_merge_cost_model(float G, int S_int, int p_int) {
 }
 
 // estimate radix merge cost if there are G keys, we have seen S rows, and we have p processors
-float radix_merge_cost_model(float G, int S_int, int p_int) {
+float radix_merge_cost_model2(float G, int S_int, int p_int) {
     float groups_per_thread = static_cast<float>(S_int);
     float p = static_cast<float>(p_int);
     return 
@@ -52,19 +53,20 @@ float radix_merge_cost_model(float G, int S_int, int p_int) {
         (1.0f / p);
 }
 
-float noradix_scan_cost_model(float G, int S_int, int p_int) {
+float noradix_scan_cost_model2(float G, int S_int, int p_int) {
     float groups_per_thread = static_cast<float>(S_int);
     return 1.0f * groups_per_thread + G * log2(G);
 }
 
-float radix_scan_cost_model(float G, int S_int, int p_int, int num_partitions) {
+float radix_scan_cost_model2(float G, int S_int, int p_int, int num_partitions) {
     float groups_per_thread = static_cast<float>(S_int);
     float N = static_cast<float>(num_partitions);
     return 2.0f * groups_per_thread + G * log2(G / N);
 }
 
-
 void adaptive_alg4_sol(ExpConfig &config, RowStore &table, int trial_idx, bool do_print_stats, std::vector<AggResRow> &agg_res) {
+
+    const int step_size_upper_bound = 128 * config.batch_size;
 
     auto n_cols = table.n_cols;
     auto n_rows = table.n_rows;
@@ -118,13 +120,15 @@ void adaptive_alg4_sol(ExpConfig &config, RowStore &table, int trial_idx, bool d
     // Step-wise G sampling
     int this_step_n_sampled_row = 0;
     float this_step_G_hat = 1.0f;
+    int this_step_g_tilde_sum = 0;
     ska::flat_hash_map<int64_t, int64_t, I64Hasher> this_step_g_sample_map;
 
     do {
+        std::cout << "==================================================================" << std::endl;
         std::cout << "adaptation_step = " << adaptation_step << std::endl;
-        std::cout << "row_lb = " << row_lb << std::endl;
+        std::cout << ">> adaption-step=" << adaptation_step << ", row_lb = " << row_lb << std::endl;
         std::cout << "row_ub = " << row_ub << std::endl;
-        std::cout << "S = " << S << std::endl;
+        std::cout << ">> adaption-step=" << adaptation_step << ", S = " << S << std::endl;
         std::cout << "p_hat = " << p_hat << std::endl;
         
     
@@ -157,13 +161,15 @@ void adaptive_alg4_sol(ExpConfig &config, RowStore &table, int trial_idx, bool d
                 }
                 if (tid == 0 && r % (128 / p) < 4) { // sample once in a while
                     n_sampled_row += 1;
+                    this_step_n_sampled_row += 1;
                     g_sample_map[table.get(r, 0)] = 0;
+                    this_step_g_sample_map[table.get(r, 0)] = 0;
                 }
             }
             
             if (tid == 0) {
                 g_tilde_sum = g_sample_map.size();
-                this_step_g_sample_map.clear();
+                this_step_g_tilde_sum = this_step_g_sample_map.size();
             }
 
             // #pragma omp atomic
@@ -191,8 +197,34 @@ void adaptive_alg4_sol(ExpConfig &config, RowStore &table, int trial_idx, bool d
         std::cout << "<sampling> max_G_hat = " << max_G_hat << std::endl;
         int G_hat_int = static_cast<int>(max_G_hat);
         
+
+        std::cout << "<sampling> this_step_n_sampled_row = " << this_step_n_sampled_row << std::endl;
+        std::cout << "<sampling> this_step_g_tilde_sum = " << this_step_g_tilde_sum << std::endl;
+        float step_local_G_hat = estimate_G(static_cast<float>(this_step_n_sampled_row), static_cast<float>(this_step_g_tilde_sum));
+        std::cout << "<sampling> step_local_G_hat = " << step_local_G_hat << std::endl;
+
+
+        row_lb = row_ub;
+        S *= 2;
+        S = std::min(S, step_size_upper_bound);
+        row_ub = row_lb + S;
+
+        bool reset_exponential_stepping = false;
+        if (step_local_G_hat <= 0.5 * prev_max_G_hat && this_step_g_tilde_sum < this_step_n_sampled_row - (config.batch_size / 10)) {
+            std::cout << "⚠️ noticing sharp decrease in G estimation, resetting, just scanned was << " << row_lb << " - " << row_ub << std::endl;
+            reset_exponential_stepping = true;
+            S = B;
+            G_hat = step_local_G_hat;
+            prev_max_G_hat = step_local_G_hat;
+            max_G_hat = step_local_G_hat;
+            G_hat_int = static_cast<int>(max_G_hat);
+            n_sampled_row = this_step_n_sampled_row;
+            g_sample_map.clear();
+        }
+        row_ub = row_lb + S;
+
         // once we see enough rows, enough groups, and see that G_hat stablizes, we decide to switch to lock free
-        if ((row_ub >= 3000000 && G_hat_int >= 300000 && G_hat <= 1.2 * prev_max_G_hat) || a_hat == StratEnum::LOCKFREE) {
+        if ((row_ub >= 3000000 && G_hat_int >= 300000 && G_hat <= 1.2 * prev_max_G_hat) || (a_hat == StratEnum::LOCKFREE && (!reset_exponential_stepping))) {
             std::cout << ">> adaption-step=" << adaptation_step << ", adapt-to=lock-free" << std::endl;
             a_hat = StratEnum::LOCKFREE;
             p_hat = p;
@@ -221,11 +253,11 @@ void adaptive_alg4_sol(ExpConfig &config, RowStore &table, int trial_idx, bool d
 
             int p_hat_candidate=p;
             // for (int p_hat_candidate = 1; p_hat_candidate <= p; p *= 2) {
-                float central_merge_cost = central_merge_cost_model(max_G_hat, 2 * S, p_hat_candidate);
-                float tree_merge_cost = tree_merge_cost_model(max_G_hat, 2 * S, p_hat_candidate);
-                float radix_merge_cost = radix_merge_cost_model(max_G_hat, 2 * S, p_hat_candidate);
-                float noradix_scan_cost = noradix_scan_cost_model(max_G_hat, 2 * S, p_hat_candidate);
-                float radix_scan_cost = radix_scan_cost_model(max_G_hat, 2 * S, p_hat_candidate, n_partitions);
+                float central_merge_cost = central_merge_cost_model2(max_G_hat, S, p_hat_candidate);
+                float tree_merge_cost = tree_merge_cost_model2(max_G_hat, S, p_hat_candidate);
+                float radix_merge_cost = radix_merge_cost_model2(max_G_hat, S, p_hat_candidate);
+                float noradix_scan_cost = noradix_scan_cost_model2(max_G_hat, S, p_hat_candidate);
+                float radix_scan_cost = radix_scan_cost_model2(max_G_hat, S, p_hat_candidate, n_partitions);
                 std::cout << "central_merge_cost " << central_merge_cost << std::endl;
                 std::cout << "tree_merge_cost " << tree_merge_cost << std::endl;
                 std::cout << "radix_merge_cost " << radix_merge_cost << std::endl;
@@ -272,10 +304,13 @@ void adaptive_alg4_sol(ExpConfig &config, RowStore &table, int trial_idx, bool d
             }
         }
         
-        row_lb = row_ub;
-        S *= 2;
-        row_ub = row_lb + S;
+
+        this_step_g_sample_map.clear();
+        this_step_n_sampled_row = 0;
         adaptation_step += 1;
+
+        // if (adaptation_step == 30) exit(0);
+
     } while (row_lb < n_rows);
     
     // parallel merge radix
