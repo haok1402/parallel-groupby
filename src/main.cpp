@@ -8,525 +8,73 @@
 #include <string>
 #include <utility>
 #include "CLI11.hpp"
+#include "lib.hpp"
+#include "algs/_all_algs.hpp"
 
-struct Entry {
-    int64_t l_orderkey;
-    int64_t l_partkey;
-    int64_t l_suppkey;
-};
-
-// struct AggMapValue {
-//     int64_t v1;
-//     int64_t v2;
-// };
-
-
-enum class AggFunc {
-    SUM,
-    AVG,
-    MIN,
-    MAX
-};
-
-enum class Strategy {
-    SEQUENTIAL,
-    GLOBAL_LOCK,
-    TWO_PHASE_CENTRALIZED_MERGE,
-    SIMPLE_THREE_PHASE_RADIX,
-};
-
-// experiment config, including input file, what to group, what to aggregate, etc.
-class ExpConfig {
-public:
-    int num_threads;
-    int batch_size;
-    Strategy strategy;
-    int num_dryruns;
-    int num_trials;
-    std::string in_db_file_path;
-    std::string in_table_name;
-    std::string group_key_col_name;
-    std::vector<std::string> data_col_names;
-    std::vector<AggFunc> agg_funcs; // TODO support diffeerent aggregation functions
-    
-    void display() {
-        std::cout << "exp config:" << std::endl;
-        std::cout << "num_threads = " << num_threads << std::endl;
-        std::cout << "batch_size = " << batch_size << std::endl;
-        std::cout << "strategy = " << ((int) strategy) << std::endl;
-        std::cout << "in_db_file_path = " << in_db_file_path << std::endl;
-        std::cout << "in_table_name = " << in_table_name << std::endl;
-        std::cout << "group_key_col_name = " << group_key_col_name << std::endl;
-        std::cout << "data_col_names = [";
-        for (const auto& col : data_col_names) {
-            std::cout << col << ", ";
-        }
-        std::cout << "]" << std::endl;
-        std::cout << "agg_funcs = [";
-        for (const auto& func : agg_funcs) {
-            std::cout << ((int) func) << ", ";
-        }
-        std::cout << "]" << std::endl;
-    }
-};
-
-// column major data storage
-// usage: first reserve all memory, then write to each cell
-class ColumnStore {
-public:
-    // std::vector<int64_t> data; 
-    int64_t* data; 
-    int n_cols;
-    int n_rows;
-    
-    void init_table(int num_cols, int num_rows) {
-        n_cols = num_cols;
-        n_rows = num_rows;
-        // data.resize(num_cols * num_rows);
-        data = new int64_t[num_cols * num_rows];
-    }
-    
-    inline int get_idx(int row_idx, int col_idx) {
-        return col_idx * n_rows + row_idx;
-    }
-    
-    inline int64_t get(int row_idx, int col_idx) {
-        return data[get_idx(row_idx, col_idx)];
-    }
-    
-    inline void write_value(int row_idx, int col_idx, int64_t value) {
-        data[get_idx(row_idx, col_idx)] = value;
-    }
-
-};
-
-class RowStore {
-public:
-    // std::vector<int64_t> data;
-    int64_t* data; 
-    int n_cols;
-    int n_rows;
-    
-    void init_table(int num_cols, int num_rows) {
-        n_cols = num_cols;
-        n_rows = num_rows;
-        // data.resize(num_cols * num_rows);
-        data = new int64_t[num_cols * num_rows];
-    }
-    
-    inline int get_idx(int row_idx, int col_idx) {
-        return row_idx * n_cols + col_idx;
-    }
-    
-    inline void write_value(int row_idx, int col_idx, int64_t value) {
-        data[get_idx(row_idx, col_idx)] = value;
-    }
-    
-    inline int64_t get(int row_idx, int col_idx) {
-        return data[get_idx(row_idx, col_idx)];
-    }
-};
-
-
-// using config specification, load stuff into table
-// for now, assume one group column, and group key column is not any of the value columns
-void load_data(ExpConfig &config, RowStore &table) {
-    duckdb::DuckDB db(config.in_db_file_path);
-    duckdb::Connection con(db);
-    
-    auto table_description = con.TableInfo(config.in_table_name);
-    // std::string sql_qry = "SELECT " + config.group_key_col_name + " % 100000";
-    std::string sql_qry = "SELECT " + config.group_key_col_name;
-    for (const auto& col_name : config.data_col_names) {
-        sql_qry += ", " + col_name;
-    }
-    sql_qry += " FROM " + config.in_table_name;
-    std::cout << "query string = " << sql_qry << std::endl;
-    auto duckdb_res = con.Query(sql_qry);
-
-    int n_cols = config.data_col_names.size() + 1;
-    table.init_table(n_cols, duckdb_res->RowCount());
-    
-    // go through all chunks
-    int r = 0;
-    while (auto chunk = duckdb_res->Fetch()) {
-        // go through each col i in the chunk
-        for (duckdb::idx_t r_in_chunk = 0; r_in_chunk < chunk->size(); r_in_chunk++) {
-            for (duckdb::idx_t c = 0; c < n_cols; c++) {
-                table.write_value(r, c, chunk->GetValue(c, r_in_chunk).GetValue<int64_t>());
-            }
-            r++;
-        }
-    }
-    
-    std::cout << "table.n_rows = " << table.n_rows << std::endl;
-    std::cout << "table.n_cols = " << table.n_cols << std::endl;
-}
-
-typedef std::array<int64_t, 2> AggMapValue; // TODO is there a way to not hard code the size?
-
-// requires table to be populated and in memory
-void sequential_sol(ExpConfig &config, RowStore &table, int trial_idx) {
-    assert(table.n_rows > 0);
-    assert(table.n_cols > 0);
-    
-    auto n_cols = table.n_cols;
-    auto n_rows = table.n_rows;
-    assert(n_cols == 3); // how to support dynamic col count?
-    
-    auto t0 = std::chrono::steady_clock::now();
-
-    std::unordered_map<int64_t, AggMapValue> agg_map;
-    for (size_t r = 0; r < n_rows; r++) {
-        auto group_key = table.get(r, 0);
-        
-        // find existing entry, if not initialise
-        AggMapValue agg_acc;
-        if (auto search = agg_map.find(group_key); search != agg_map.end()) {
-            agg_acc = search->second;
-        } else {
-            agg_acc = AggMapValue{0, 0};
-        }
-
-        for (size_t c = 1; c < n_cols; c++) {
-            agg_acc[c - 1] = agg_acc[c - 1] + table.get(r, c);
-        }
-        agg_map[group_key] = agg_acc;
-    }
-
-    auto t1 = std::chrono::steady_clock::now();
-    std::cout << ">>> elapsed time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << " ms" << std::endl;
-
-    // spot checking
-    std::cout << 419 << " -> (" << agg_map[419][0] << ", " << agg_map[419][1] << ")" << std::endl;
-    std::cout << 3488 << " -> (" << agg_map[3488][0] << ", " << agg_map[3488][1] << ")" << std::endl;
-    std::cout << 5997667 << " -> (" << agg_map[5997667][0] << ", " << agg_map[5997667][1] << ")" << std::endl;
-}
-
-typedef std::chrono::time_point<std::chrono::steady_clock> chrono_time_point;
-
-void naive_2phase_centralised_merge_sol(ExpConfig &config, RowStore &table, int trial_idx) {
-    omp_set_num_threads(config.num_threads);
-    
-    auto n_cols = table.n_cols;
-    auto n_rows = table.n_rows;
-
-    chrono_time_point t_overall_0;
-    chrono_time_point t_overall_1;
-    chrono_time_point t_phase1_0;
-    chrono_time_point t_phase1_1;
-    chrono_time_point t_phase2_0;
-    chrono_time_point t_phase2_1;
-    
-    t_overall_0 = std::chrono::steady_clock::now();
-
-    auto local_agg_maps = std::vector<std::unordered_map<int64_t, AggMapValue>>(config.num_threads);
-    assert(local_agg_maps.size() == config.num_threads);
-    std::unordered_map<int64_t, AggMapValue> agg_map; // where merged results go
-    
-    #pragma omp parallel
-    {
-        int tid = omp_get_thread_num();
-        int actual_num_threads = omp_get_num_threads();
-        // printf("hello from thread %d among %d threads\n", tid, actual_num_threads);
-        assert(actual_num_threads == config.num_threads);
-        
-        // PHASE 1: local aggregation map
-        std::unordered_map<int64_t, AggMapValue> local_agg_map;
-        
-        if (tid == 0) {
-            t_phase1_0 = std::chrono::steady_clock::now();
-        }
-        
-        // #pragma omp for schedule(dynamic, config.batch_size)
-        #pragma omp for schedule(static, config.batch_size)
-        for (size_t r = 0; r < n_rows; r++) {
-            auto group_key = table.get(r, 0);
-            AggMapValue agg_acc;
-            if (auto search = local_agg_map.find(group_key); search != local_agg_map.end()) {
-                agg_acc = search->second;
-            } else {
-                agg_acc = AggMapValue{0, 0};
-            }
-    
-            for (size_t c = 1; c < n_cols; c++) {
-                agg_acc[c - 1] = agg_acc[c - 1] + table.get(r, c);
-            }
-            local_agg_map[group_key] = agg_acc;
-        }
-        local_agg_maps[tid] = local_agg_map;
-        
-        #pragma omp barrier
-        
-        if (tid == 0) {
-            t_phase1_1 = std::chrono::steady_clock::now();
-            std::cout << ">> Phase 1 time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_phase1_1 - t_phase1_0).count() << " ms" << std::endl;
-        }
-
-        // PHASE 2: thread 0 merges results
-        if (tid == 0) {
-            t_phase2_0 = std::chrono::steady_clock::now();
-            
-            agg_map = std::move(local_agg_maps[0]);
-            
-            for (int other_tid = 1; other_tid < actual_num_threads; other_tid++) {
-                auto other_local_agg_map = local_agg_maps[other_tid];
-                
-                for (const auto& [group_key, other_agg_acc] : other_local_agg_map) {
-                    AggMapValue agg_acc;
-                    if (auto search = agg_map.find(group_key); search != agg_map.end()) {
-                        agg_acc = search->second;
-                        for (size_t c = 1; c < n_cols; c++) {
-                            agg_acc[c - 1] = agg_acc[c - 1] + other_agg_acc[c - 1];
-                        }
-                    } else {
-                        agg_acc = other_agg_acc;
-                    }
-                    agg_map[group_key] = agg_acc;
-                }
-            }
-            
-            t_phase2_1 = std::chrono::steady_clock::now();
-            std::cout << ">> Phase 2 time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_phase2_1 - t_phase2_0).count() << " ms" << std::endl;
-
-        }
-    }
-    
-    t_overall_1 = std::chrono::steady_clock::now();
-    std::cout << ">>> elapsed time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_overall_1 - t_overall_0).count() << " ms" << std::endl;
-    // spot checking
-    std::cout << 419 << " -> (" << agg_map[419][0] << ", " << agg_map[419][1] << ")" << std::endl;
-    std::cout << 3488 << " -> (" << agg_map[3488][0] << ", " << agg_map[3488][1] << ")" << std::endl;
-    std::cout << 5997667 << " -> (" << agg_map[5997667][0] << ", " << agg_map[5997667][1] << ")" << std::endl;
-
-}
-
-// phase 1: independent local scans directly into radix partitioning, with num partitions = num threads
-// phase 2: independently, each thread merges one partition
-// phase 3: thread 0 combine results without any probing
-void simple_3phase_radix_partition_sol(ExpConfig &config, RowStore &table, int trial_idx) {
-    omp_set_num_threads(config.num_threads);
-    
-    auto n_cols = table.n_cols;
-    auto n_rows = table.n_rows;
-
-    chrono_time_point t_overall_0;
-    chrono_time_point t_overall_1;
-    chrono_time_point t_phase1_0;
-    chrono_time_point t_phase1_1;
-    chrono_time_point t_phase2_0;
-    chrono_time_point t_phase2_1;
-    chrono_time_point t_phase3_0;
-    chrono_time_point t_phase3_1;
-    
-    t_overall_0 = std::chrono::steady_clock::now();
-
-    // auto local_agg_maps = std::vector<std::unordered_map<int64_t, AggMapValue>>(config.num_threads);
-    // assert(local_agg_maps.size() == config.num_threads);
-    std::unordered_map<int64_t, AggMapValue> agg_map; // where merged results go
-    
-    int n_bits_for_radix = round(log2(config.num_threads));
-    assert (0x1 << n_bits_for_radix == config.num_threads);
-    int n_partitions = config.num_threads;
-    
-    // radix_partitions being a size n_thread array of n_thread array of local agg maps
-    std::vector<std::vector<std::unordered_map<int64_t, AggMapValue>>> radix_partitions_local_maps(n_partitions, std::vector<std::unordered_map<int64_t, AggMapValue>>(config.num_threads));
-    // for (auto& partition : radix_partitions_local_maps) { partition.resize(config.num_threads); }
-    // radix_partitions[2][3] is thread 3's result for partition 2
-    
-    std::cout << "done initialising all the partitions" << std::endl;
-    
-    #pragma omp parallel
-    {
-        int tid = omp_get_thread_num();
-        int actual_num_threads = omp_get_num_threads();
-        // printf("hello from thread %d among %d threads\n", tid, actual_num_threads);
-        assert(actual_num_threads == config.num_threads);
-        
-        // === PHASE 1: local aggregation map === 
-        
-        std::vector<std::unordered_map<int64_t, AggMapValue>> local_radix_partitions(config.num_threads);
-        
-        if (tid == 0) {
-            t_phase1_0 = std::chrono::steady_clock::now();
-        }
-        
-        // #pragma omp for schedule(dynamic, config.batch_size)
-        #pragma omp for schedule(static, config.batch_size)
-        for (size_t r = 0; r < n_rows; r++) {
-            int64_t group_key = table.get(r, 0);
-            
-            size_t group_key_hash = std::hash<int64_t>{}(group_key);
-            size_t part_idx = group_key_hash % n_partitions;
-            
-            AggMapValue agg_acc;
-            if (auto search = local_radix_partitions[part_idx].find(group_key); search != local_radix_partitions[part_idx].end()) {
-                agg_acc = search->second;
-            } else {
-                agg_acc = AggMapValue{0, 0};
-            }
-    
-            for (size_t c = 1; c < n_cols; c++) {
-                agg_acc[c - 1] = agg_acc[c - 1] + table.get(r, c);
-            }
-            local_radix_partitions[part_idx][group_key] = agg_acc;
-        }
-        for (size_t part_idx = 0; part_idx < n_partitions; part_idx++) {
-            radix_partitions_local_maps[part_idx][tid] = local_radix_partitions[part_idx];
-        }        
-        #pragma omp barrier
-        
-        if (tid == 0) {
-            t_phase1_1 = std::chrono::steady_clock::now();
-            std::cout << ">> Phase 1 time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_phase1_1 - t_phase1_0).count() << " ms" << std::endl;
-        }
-
-        // === PHASE 2: local aggregation map === 
-
-        if (tid == 0) {
-            t_phase2_0 = std::chrono::steady_clock::now();
-        }
-
-        #pragma omp for schedule(static, 1)
-        for (size_t part_idx = 0; part_idx < n_partitions; part_idx++) {
-            for (size_t other_tid = 1; other_tid < actual_num_threads; other_tid++) {
-                auto other_local_agg_map = radix_partitions_local_maps[part_idx][other_tid];
-                
-                for (const auto& [group_key, other_agg_acc] : other_local_agg_map) {
-                    AggMapValue agg_acc;
-                    if (auto search = radix_partitions_local_maps[part_idx][0].find(group_key); search != radix_partitions_local_maps[part_idx][0].end()) {
-                        agg_acc = search->second;
-                        for (size_t c = 1; c < n_cols; c++) {
-                            agg_acc[c - 1] = agg_acc[c - 1] + other_agg_acc[c - 1];
-                        }
-                    } else {
-                        agg_acc = other_agg_acc;
-                    }
-                    radix_partitions_local_maps[part_idx][0][group_key] = agg_acc; // merge into tid 0's map for this partition
+void validate_results(std::vector<AggResRow> agg_res, std::unordered_map<int64_t, AggMapValue> reference_agg_map) {
+    std::cout << "agg_res has size " << agg_res.size() << ", check this manually" << std::endl;
+    for (const auto& row : agg_res) {
+        // if row in reference_agg_map, check each value equal
+        auto group_key = row[0];
+        if (auto search = reference_agg_map.find(group_key); search != reference_agg_map.end()) {
+            for (size_t i = 1; i < row.size(); ++i) {
+                if (row[i] != search->second[i-1]) {
+                    std::cerr << "Validation failed: group_key " << row[0] << ", column " << i << ", expect " << search->second[i-1] << ", got " << row[i] << std::endl;
+                    throw std::runtime_error("Results are wrong");
                 }
             }
         }
-        
-        if (tid == 0) {
-            t_phase2_1 = std::chrono::steady_clock::now();
-            std::cout << ">> Phase 2 time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_phase2_1 - t_phase2_0).count() << " ms" << std::endl;
-        }
-
-        // === PHASE 3: thread 0 combine results without any probing === 
-
-        if (tid == 0) {
-            t_phase3_0 = std::chrono::steady_clock::now();
-            
-            agg_map = std::move(radix_partitions_local_maps[0][0]);
-            
-            for (size_t part_idx = 1; part_idx < n_partitions; part_idx++) {
-                agg_map.merge(radix_partitions_local_maps[part_idx][0]);
-            }
-            
-            t_phase3_1 = std::chrono::steady_clock::now();
-            std::cout << ">> Phase 3 time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_phase3_1 - t_phase3_0).count() << " ms" << std::endl;
-
-        }
     }
-    
-    t_overall_1 = std::chrono::steady_clock::now();
-    std::cout << ">>> elapsed time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_overall_1 - t_overall_0).count() << " ms" << std::endl;
-    // spot checking
-    std::cout << 419 << " -> (" << agg_map[419][0] << ", " << agg_map[419][1] << ")" << std::endl;
-    std::cout << 3488 << " -> (" << agg_map[3488][0] << ", " << agg_map[3488][1] << ")" << std::endl;
-    std::cout << 5997667 << " -> (" << agg_map[5997667][0] << ", " << agg_map[5997667][1] << ")" << std::endl;
-
 }
 
-void dumb_global_lock_sol(ExpConfig &config, RowStore &table, int trial_idx) {
-    omp_set_num_threads(config.num_threads);
-    
-    auto n_cols = table.n_cols;
-    auto n_rows = table.n_rows;
-
-    chrono_time_point t_overall_0;
-    chrono_time_point t_overall_1;
-    
-    t_overall_0 = std::chrono::steady_clock::now();
-
-    std::unordered_map<int64_t, AggMapValue> agg_map;
-    
-    #pragma omp parallel
-    {
-        int tid = omp_get_thread_num();
-        int actual_num_threads = omp_get_num_threads();
-        assert(actual_num_threads == config.num_threads);
-        
-        // #pragma omp for schedule(dynamic, config.batch_size)
-        #pragma omp for schedule(static, config.batch_size)
-        for (size_t r = 0; r < n_rows; r++) {
-            #pragma omp critical 
-            {
-                auto group_key = table.get(r, 0);
-                AggMapValue agg_acc;
-                if (auto search = agg_map.find(group_key); search != agg_map.end()) {
-                    agg_acc = search->second;
-                } else {
-                    agg_acc = AggMapValue{0, 0};
-                }
-        
-                for (size_t c = 1; c < n_cols; c++) {
-                    agg_acc[c - 1] = agg_acc[c - 1] + table.get(r, c);
-                }
-                agg_map[group_key] = agg_acc;
-            }
-        }
-    }
-    
-    t_overall_1 = std::chrono::steady_clock::now();
-    std::cout << ">>> elapsed time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_overall_1 - t_overall_0).count() << " ms" << std::endl;
-    // spot checking
-    std::cout << 419 << " -> (" << agg_map[419][0] << ", " << agg_map[419][1] << ")" << std::endl;
-    std::cout << 3488 << " -> (" << agg_map[3488][0] << ", " << agg_map[3488][1] << ")" << std::endl;
-    std::cout << 5997667 << " -> (" << agg_map[5997667][0] << ", " << agg_map[5997667][1] << ")" << std::endl;
-
+void print_agg_stats(std::vector<AggResRow> agg_res) {
+    std::cout << ">> output has " << agg_res.size() << " rows" << std::endl;
 }
 
 int main(int argc, char *argv[]) {
+
+    // int n_sampled_row = 1110000;
+    // int g_tilde_sum = 1079607;
+
+    // float est = estimate_G(((float) n_sampled_row), ((float) g_tilde_sum));
+    // std::cout << "est = " << est << std::endl;
+    // exit(0);
     
     // 1 > parse command line
     
     // set defaults
     ExpConfig config;
     config.num_threads = 1;
-    config.num_dryruns = 1;
-    config.num_trials = 3;
+    config.radix_partition_cnt_ratio = 4; // num radix partitions = this * num_threads, higher number may mean smaller granularity for any dynamic scheduling
+    config.num_dryruns = 0;
+    config.num_trials = 1;
+    config.cardinality_reduction = -1; // option to reduce the number of unique group keys, or -1 to not do it
     config.batch_size = 10000;
-    config.strategy = Strategy::SEQUENTIAL;
-    config.in_db_file_path = "data/tpch-sf1.db";
+    config.duckdb_style_adaptation_threshold = 10000;
+    config.algorithm = "SEQUENTIAL";
+    config.dataset_file_path = "data/exponential/100K-1K.csv.gz";
+    config.validation_file_path = "data/exponential/val-100K-1K.csv.gz";
     config.in_table_name = "lineitem";
-    config.group_key_col_name = "l_orderkey";
-    config.data_col_names = {"l_partkey", "l_suppkey"};
-    config.agg_funcs = {AggFunc::SUM, AggFunc::SUM};
+    // for our own generated dataset, there's only a key column and a val column:
+    config.group_key_col_name = "key";
+    config.data_col_names = {"val"};
     
     CLI::App app{"Whatever"};
     
-    app.add_option("--num_threads", config.num_threads);
+    app.add_option("--num_threads", config.num_threads, "Number of threads to use during execution")->required();
+    app.add_option("--num_dryruns", config.num_dryruns, "Number of warmup iterations before measurement begins")->default_val(3);
+    app.add_option("--num_trials", config.num_trials, "Number of timed iterations to run for benchmarking")->default_val(5);
+    app.add_option("--cardinality_reduction", config.cardinality_reduction);
+    app.add_option("--radix_partition_cnt_ratio", config.radix_partition_cnt_ratio);
+    app.add_option("--duckdb_style_adaptation_threshold", config.duckdb_style_adaptation_threshold);
     app.add_option("--batch_size", config.batch_size);
     std::string strat_str = "SEQUENTIAL";
-    app.add_option("--strategy", strat_str);
-    app.add_option("--in_db_file_path", config.in_db_file_path);
+    app.add_option("--algorithm", config.algorithm);
+    app.add_option("--dataset_file_path", config.dataset_file_path, "Path to the gzipped CSV input file (with two integer columns)")->check(CLI::ExistingFile)->required();
+    app.add_option("--validation_file_path", config.validation_file_path, "Path to sampled reference results")->check(CLI::ExistingFile)->required();
     app.add_option("--in_table_name", config.in_table_name);
-    // app.add_option("--group_key_col_name", config.group_key_col_name);
     
     CLI11_PARSE(app, argc, argv);
-
-    if (strat_str == "SEQUENTIAL") {
-        config.strategy = Strategy::SEQUENTIAL;
-    } else if (strat_str == "GLOBAL_LOCK") {
-        config.strategy = Strategy::GLOBAL_LOCK;
-    } else if (strat_str == "TWO_PHASE_CENTRALIZED_MERGE") {
-        config.strategy = Strategy::TWO_PHASE_CENTRALIZED_MERGE;
-    } else if (strat_str == "SIMPLE_THREE_PHASE_RADIX") {
-        config.strategy = Strategy::SIMPLE_THREE_PHASE_RADIX;
-    } else {
-        throw std::runtime_error("Unsupported strategy");
-    }
 
     config.display();
     
@@ -534,31 +82,66 @@ int main(int argc, char *argv[]) {
     
     RowStore table;
     load_data(config, table);
+    std::cout << "loaded data into memory" << std::endl;
+    std::vector<AggResRow> agg_res; // where to write results to
     
-    auto run_once = [&](int run_idx) {
-        if (config.strategy == Strategy::SEQUENTIAL) {
-            sequential_sol(config, table, run_idx);
-        } else if (config.strategy == Strategy::GLOBAL_LOCK) {
-            dumb_global_lock_sol(config, table, run_idx);
-        } else if (config.strategy == Strategy::TWO_PHASE_CENTRALIZED_MERGE) {
-            naive_2phase_centralised_merge_sol(config, table, run_idx);
-        } else if (config.strategy == Strategy::SIMPLE_THREE_PHASE_RADIX) {
-            simple_3phase_radix_partition_sol(config, table, run_idx);
-        } else {
-            throw std::runtime_error("Unsupported strategy");
-        }
-    };
+    std::function<void(ExpConfig &config, RowStore &table, int trial_idx, bool do_print_stats, std::vector<AggResRow> &agg_res)> selected_alg;
+    
+    if (config.algorithm == "sequential") {
+        selected_alg = sequential_sol;
+    } else if (config.algorithm == "two-phase-central-merge") {
+        selected_alg = two_phase_centralised_merge_sol;
+    } else if (config.algorithm == "two-phase-tree-merge") {
+        selected_alg = two_phase_tree_merge_sol;
+    } else if (config.algorithm == "two-phase-central-merge-xxhash") {
+        selected_alg = two_phase_centralised_merge_xxhash_sol;
+    } else if (config.algorithm == "global-lock") {
+        selected_alg = global_lock_sol;
+    } else if (config.algorithm == "two-phase-radix") {
+        selected_alg = two_phase_radix_sol;
+    } else if (config.algorithm == "two-phase-radix-xxhash") {
+        selected_alg = two_phase_radix_xxhash_sol;
+    } else if (config.algorithm == "duckdbish-two-phase") {
+        selected_alg = duckdbish_two_phase_sol;
+    } else if (config.algorithm == "implicit-repartitioning") {
+        selected_alg = implicit_repartitioning_sol;
+    } else if (config.algorithm == "three-phase-radix") {
+        selected_alg = three_phase_radix_sol;
+    } else if (config.algorithm == "omp-lock-free-hash-table") {
+        selected_alg = omp_lock_free_hash_table_sol;
+    } else if (config.algorithm == "lock-free-hash-table") {
+        selected_alg = lock_free_hash_table_sol;
+    } else if (config.algorithm == "adaptive-alg1") {
+        selected_alg = adaptive_alg1_sol;
+    } else if (config.algorithm == "adaptive-alg2") {
+        selected_alg = adaptive_alg2_sol;
+    } else if (config.algorithm == "adaptive-alg3") {
+        selected_alg = adaptive_alg3_sol;
+    } else if (config.algorithm == "adaptive-alg4") {
+        selected_alg = adaptive_alg4_sol;
+    } else {
+        throw std::runtime_error("Unsupported algorithm");
+    }
     
     // 3 > run the experiment
+    std::cout << "Running " << config.num_dryruns << " warm-up iteration(s) to stabilize performance" << std::endl;
     for (int dryrun_idx = 0; dryrun_idx < config.num_dryruns; dryrun_idx++) {
-        printf(">>> running dryrun %d\n", dryrun_idx);
-        run_once(dryrun_idx);
+        agg_res.clear();
+        printf(">> --- running dryrun %d ---\n", dryrun_idx);
+        selected_alg(config, table, dryrun_idx, false, agg_res);
     }
 
+    std::cout << "Running " << config.num_trials << " evaluation iteration(s) for benchmarking" << std::endl;
     for (int trial_idx = 0; trial_idx < config.num_trials; trial_idx++) {
-        printf(">>> running trial %d\n", trial_idx);
-        run_once(trial_idx);
+        printf(">> --- running trial %d ---\n", trial_idx);
+        agg_res.clear();
+        selected_alg(config, table, trial_idx, true, agg_res);
     }
+        
+    std::cout << "Validating results against reference" << std::endl;
+    auto reference_agg_map = load_valiadtion_data(config);
+    validate_results(agg_res, reference_agg_map);
+    std::cout << "Validation passes" << std::endl;
     
     return 0;
 }
